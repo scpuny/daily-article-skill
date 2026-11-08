@@ -397,6 +397,16 @@
   .mini-grid .m{position:relative;cursor:help}
   .mini-grid .m.has-hint{border-color:rgba(0,212,255,.34)}
   .mini-grid .m.has-hint::after{content:"?";position:absolute;top:1px;right:3px;font-size:8px;color:var(--cyan);opacity:.75}
+  /* 口径浮层：hover 即时显示；position:fixed 不受面板 overflow 裁剪 */
+  .tip-pop{position:fixed;z-index:9999;display:none;max-width:min(360px,calc(100vw - 24px));
+    padding:10px 13px;border-radius:10px;background:#12294a;
+    border:1px solid rgba(0,212,255,.7);border-left:3px solid var(--cyan);
+    box-shadow:0 14px 40px rgba(0,0,0,.7);
+    color:#eaf4ff;font-size:12.5px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+    pointer-events:none}
+  .tip-pop.show{display:block}
+  .qmark:hover,.stepbar .sp:hover .dot,.mini-grid .m.has-hint:hover{
+    border-color:var(--cyan);background:rgba(0,212,255,.12)}
 </style>
 </head>
 <body>
@@ -562,6 +572,62 @@ async function api(m,u,b){const o={method:m,headers:{}};if(b!==undefined){o.head
   const r=await fetch(u,o);const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||("HTTP "+r.status));return d;}
 function esc(s){return (s||"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
 function fmt(n){return (n===null||n===undefined)?"—":Number(n).toLocaleString("zh-CN");}
+/* ===== 口径浮层 =====
+   原生 title 在 13px 的 ? 徽标上几乎不弹（需静止悬停约 1s，鼠标微动即重置计时），
+   且会被面板 overflow 裁剪。这里统一接管 title / data-tip，用 fixed 浮层即时显示。 */
+let tipEl=null,tipAnchor=null,tipPinned=false;
+function tipTextOf(el){
+  let t=el.getAttribute("data-tip");
+  if(!t&&el.hasAttribute("title")){
+    t=el.getAttribute("title")||"";
+    if(t)el.setAttribute("data-tip",t);
+    el.removeAttribute("title");   // 移除后浏览器不会再弹原生提示
+  }
+  return t;
+}
+function placeTip(anchor){
+  if(!tipEl||!anchor)return;
+  const r=anchor.getBoundingClientRect(),t=tipEl.getBoundingClientRect(),m=10,g=10;
+  let left=r.left+r.width/2-t.width/2;
+  if(r.left<t.width/2+m)left=r.right+g;   // 锚点贴左边：改为向右展开，避免贴屏幕边缘
+  left=Math.max(m,Math.min(left,window.innerWidth-t.width-m));
+  let top=r.bottom+8;
+  if(top+t.height>window.innerHeight-m)top=Math.max(m,r.top-t.height-8);
+  tipEl.style.left=left+"px";tipEl.style.top=top+"px";
+}
+function showTip(anchor,text){
+  if(!anchor||!text)return;
+  if(!tipEl){tipEl=document.createElement("div");tipEl.className="tip-pop";document.body.appendChild(tipEl);}
+  tipEl.textContent=String(text);
+  tipEl.classList.add("show");
+  tipAnchor=anchor;
+  placeTip(anchor);
+}
+function hideTip(){if(tipEl)tipEl.classList.remove("show");tipAnchor=null;tipPinned=false;}
+function tipTarget(e){
+  const n=e.target;
+  return (n&&n.nodeType===1&&n.closest)?n.closest("[data-tip],[title]"):null;
+}
+document.addEventListener("mouseover",e=>{
+  const el=tipTarget(e);if(!el)return;
+  const t=tipTextOf(el);
+  if(t){tipPinned=false;showTip(el,t);}
+});
+document.addEventListener("mouseout",e=>{
+  const el=tipTarget(e);if(!el||tipPinned)return;
+  const to=e.relatedTarget;
+  if(to&&el.contains&&el.contains(to))return;   // 在同元素内部移动不闪
+  if(tipAnchor===el)hideTip();
+});
+document.addEventListener("click",e=>{
+  // 只有口径徽标支持「点一下钉住慢读」，避免普通按钮被误接管
+  const el=e.target&&e.target.closest?e.target.closest(".qmark,.mini-grid .m.has-hint,.stepbar .sp"):null;
+  if(!el){hideTip();return;}
+  const t=tipTextOf(el);
+  if(t){showTip(el,t);tipPinned=true;}
+});
+window.addEventListener("scroll",hideTip,true);
+window.addEventListener("resize",()=>{if(tipAnchor)placeTip(tipAnchor);});
 // 补内容用的小组件：全部由已有数据现算，不新增采集
 function sumBy(arr,f){return (arr||[]).reduce((a,x)=>a+(Number(f(x))||0),0);}
 function badge(t){return t?`<span class="h2-badge">${esc(String(t))}</span>`:"";}
