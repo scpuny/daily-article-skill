@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Runtime state / real secrets (never bundle)
+state/
+data/content/
+secrets.json
+*.log
+
+# OS
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,23 @@
+{
+  "topics": [
+    "AI 工程化",
+    "前端框架",
+    "云原生",
+    "数据库",
+    "DevOps",
+    "网络安全",
+    "程序员成长"
+  ],
+  "audience": "有一定基础的中高级开发者",
+  "wordRange": [
+    1200,
+    2500
+  ],
+  "imageStyle": "flat illustration",
+  "skipImages": false,
+  "autoPublish": true,
+  "publishTarget": "wechat",
+  "author": "内容运营台",
+  "wechatAccountId": "",
+  "themeName": "极光蓝紫"
+}

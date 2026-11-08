@@ -1,0 +1,6 @@
+# 凭据与运行态不随代码迁移；data/ 换一份即可换一个公众号
+data/secrets.json
+state/
+__pycache__/
+*.py[cod]
+.DS_Store

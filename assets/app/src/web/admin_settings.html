@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>系统设置 · 内容运营台 内容运营台</title>
+<style>
+  :root{
+    --bg:#050d1c;--panel:rgba(10,24,48,.88);--panel2:rgba(14,32,62,.62);
+    --border:rgba(64,158,255,.22);--accent:#00d4ff;--accent2:#409eff;
+    --ink:#eaf2ff;--muted:#7f95b8;--ok:#35d6a4;--warn:#ffb648;--danger:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+    background-image:linear-gradient(rgba(0,150,255,.035) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(0,150,255,.035) 1px,transparent 1px);
+    background-size:34px 34px}
+  ::-webkit-scrollbar{display:none!important}
+  *{scrollbar-width:none!important}
+  .app{height:100vh;display:flex;flex-direction:column}
+
+  /* ---------- header ---------- */
+  header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 22px;border-bottom:1px solid var(--border);
+    background:linear-gradient(90deg,rgba(8,24,50,.96),rgba(6,16,36,.92))}
+  header .left{display:flex;align-items:center;gap:14px}
+  .logo{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-size:17px;font-weight:800;color:#041226;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 18px rgba(0,212,255,.35)}
+  header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:1px}
+  header .sub{font-size:10.5px;color:var(--muted);letter-spacing:2.5px;margin-top:2px}
+  .navlink{color:#bcd4f5;text-decoration:none;font-size:12.5px;border:1px solid var(--border);
+    border-radius:8px;padding:7px 12px;transition:.18s}
+  .navlink:hover{background:rgba(0,212,255,.14);border-color:var(--accent)}
+  header .right{display:flex;align-items:center;gap:10px}
+  .state{font-size:11.5px;color:var(--muted);padding-right:6px}
+  .state b{color:var(--ok);font-weight:600}
+  button{font-family:inherit;cursor:pointer}
+  .btn{border:1px solid var(--border);background:rgba(20,44,80,.55);color:var(--ink);
+    border-radius:9px;padding:8px 15px;font-size:12.5px;transition:.18s}
+  .btn:hover{border-color:var(--accent);background:rgba(0,212,255,.14)}
+  .btn.pri{background:linear-gradient(135deg,#0089d6,#0060e0);border-color:transparent;
+    color:#fff;font-weight:700;padding:9px 20px;box-shadow:0 4px 18px rgba(0,120,255,.3)}
+  .btn.pri:hover{filter:brightness(1.14)}
+  .btn.gh{background:transparent}
+  .btn.d{color:#ff9a9a;border-color:rgba(255,107,107,.42);background:transparent}
+  .btn.d:hover{background:rgba(255,107,107,.12);border-color:var(--danger)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ---------- layout ---------- */
+  .body{flex:1;min-height:0;display:grid;grid-template-columns:214px 1fr}
+  aside{border-right:1px solid var(--border);background:rgba(6,16,36,.72);
+    padding:18px 12px;overflow:auto}
+  aside .grp{font-size:10.5px;color:var(--muted);letter-spacing:2px;margin:6px 10px 10px}
+  .navitem{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    padding:11px 12px;margin-bottom:5px;border:1px solid transparent;border-radius:9px;
+    background:transparent;color:#b8cce8;font-size:13px;transition:.18s}
+  .navitem .nav-ic{width:18px;text-align:center;font-size:14px;flex:0 0 18px}
+  .ic{width:1em;height:1em;vertical-align:-.14em;flex:0 0 auto;display:inline-block}
+  .navitem:hover{background:rgba(0,212,255,.09);color:var(--ink)}
+  .navitem.on{background:linear-gradient(90deg,rgba(0,140,255,.24),rgba(0,140,255,.06));
+    border-color:rgba(0,212,255,.35);color:#fff;font-weight:600}
+  .navitem.on .nav-ic{color:var(--accent)}
+  aside .foot{margin-top:22px;padding:12px;border-top:1px solid var(--border);
+    font-size:11px;color:var(--muted);line-height:1.8}
+  main{overflow:auto;padding:20px 24px 40px}
+  .sec{display:none;max-width:1280px;margin:0 auto}
+  .sec.on{display:block}
+  .sec-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px;gap:12px}
+  .sec-h h2{font-size:19px;margin:0;letter-spacing:.5px}
+  .sec-h p{margin:0;font-size:12px;color:var(--muted)}
+
+  .card{border:1px solid var(--border);border-radius:14px;background:var(--panel);
+    padding:18px 20px;margin-bottom:14px;box-shadow:0 6px 26px rgba(0,0,0,.25);position:relative}
+  .card::before{content:"";position:absolute;left:0;top:14px;width:3px;height:22px;
+    border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--accent),var(--accent2))}
+  .card h3{font-size:14px;margin:0 0 4px;font-weight:700}
+  .card .desc{font-size:11.5px;color:var(--muted);margin:0 0 16px;line-height:1.7}
+  .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}
+  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 18px}
+  .fld{min-width:0}
+  .fld label{display:block;font-size:12px;color:#b6cbe8;margin-bottom:6px;font-weight:600}
+  .fld .hint{display:block;font-size:10.5px;color:var(--muted);margin-top:5px;line-height:1.6}
+  input[type=text],input[type=password],input[type=number],select,textarea{
+    width:100%;border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:13px;
+    background:rgba(6,13,28,.7);color:var(--ink);font-family:inherit;transition:.18s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(0,212,255,.13)}
+  input[type=number]{-moz-appearance:textfield;appearance:textfield;font-variant-numeric:tabular-nums}
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  select option{background:#0b1c36;color:var(--ink)}
+  .num{position:relative}
+  .num input{padding-right:34px}
+  .stepper{position:absolute;right:4px;top:4px;bottom:4px;width:26px;display:flex;
+    flex-direction:column;gap:1px}
+  .stepper button{flex:1;border:none;background:transparent;color:var(--accent);
+    font-size:9px;line-height:1;padding:0;border-radius:4px}
+  .stepper button:hover{background:rgba(0,212,255,.16)}
+  .secret{position:relative}
+  .secret input{padding-right:40px}
+  .eye{position:absolute;right:5px;top:50%;transform:translateY(-50%);
+    width:30px;height:28px;border:none;background:transparent;color:var(--muted);
+    display:flex;align-items:center;justify-content:center;border-radius:6px}
+  .eye:hover{color:var(--accent);background:rgba(0,212,255,.12)}
+  .swrow{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:11px 13px;border:1px solid var(--border);border-radius:9px;background:rgba(6,13,28,.55)}
+  .swrow .tx b{display:block;font-size:12.5px;font-weight:600}
+  .swrow .tx span{display:block;font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.6}
+  .sw{position:relative;width:42px;height:23px;flex:0 0 42px}
+  .sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}
+  .sw i{position:absolute;inset:0;border-radius:99px;background:#2a3c58;transition:.2s}
+  .sw i::after{content:"";position:absolute;width:17px;height:17px;border-radius:50%;
+    background:#fff;left:3px;top:3px;transition:.2s}
+  .sw input:checked + i{background:linear-gradient(135deg,#0089d6,#00d4ff)}
+  .sw input:checked + i::after{transform:translateX(19px)}
+  .tags{display:flex;flex-wrap:wrap;gap:7px;min-height:34px;padding:6px 8px;
+    border:1px solid var(--border);border-radius:8px;background:rgba(6,13,28,.7);margin-bottom:8px}
+  .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:6px;
+    font-size:12px;background:rgba(0,140,255,.16);border:1px solid rgba(0,190,255,.28);color:#cfeaff}
+  .tag b{cursor:pointer;color:#8fb6d8;font-weight:700}
+  .tag b:hover{color:var(--danger)}
+  .readonly{opacity:.72}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:12px;line-height:1.8}
+  .kv .k{color:var(--muted)}
+  .kv .v{color:var(--ink);word-break:break-all}
+  .chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;
+    border:1px solid var(--border);color:#bcd4f5}
+  .chip.ok{color:var(--ok);border-color:rgba(53,214,164,.4);background:rgba(53,214,164,.1)}
+  .chip.warn{color:var(--warn);border-color:rgba(255,182,72,.4);background:rgba(255,182,72,.1)}
+
+  /* ---------- 主题区 ---------- */
+  .theme-wrap{display:grid;grid-template-columns:minmax(0,1fr) 430px;gap:14px;align-items:start}
+  @media (max-width:1180px){.theme-wrap{grid-template-columns:1fr}}
+  .tbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .tbar .grow{flex:1}
+  .themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:10px;margin-bottom:16px}
+  .tcard{border:1px solid var(--border);border-radius:11px;padding:11px;
+    background:rgba(8,20,42,.7);cursor:pointer;transition:.18s;position:relative}
+  .tcard:hover{transform:translateY(-2px);border-color:var(--accent2)}
+  .tcard.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 16px rgba(0,212,255,.2)}
+  .tcard .swatches{display:flex;height:26px;border-radius:6px;overflow:hidden;margin-bottom:9px}
+  .tcard .swatches i{flex:1}
+  .tcard .nm{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:5px}
+  .tcard .nm .on{color:var(--ok);font-size:10px}
+  .tcard .ds{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.5;height:31px;overflow:hidden}
+  .tcard .ops{display:flex;gap:6px;margin-top:9px}
+  .tcard .ops button{flex:1;font-size:10.5px;padding:5px 4px;border-radius:6px;
+    border:1px solid var(--border);background:rgba(20,44,80,.5);color:#bcd4f5}
+  .tcard .ops button:hover{border-color:var(--accent);color:#fff}
+  .tcard .ops button.act{background:rgba(53,214,164,.14);border-color:rgba(53,214,164,.4);color:var(--ok)}
+  .tmeta{display:grid;grid-template-columns:1.4fr 2fr auto;gap:10px;align-items:end;margin-bottom:16px}
+  .tmeta .fld label{margin-bottom:6px}
+  .tokgrp{margin-bottom:16px}
+  .tokgrp h4{font-size:12px;margin:0 0 9px;color:#b6cbe8;
+    display:flex;align-items:center;gap:8px}
+  .tokgrp h4::after{content:"";flex:1;height:1px;background:var(--border)}
+  .toks{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:9px 14px}
+  .tok{display:flex;align-items:center;gap:8px;padding:6px 8px;
+    border:1px solid rgba(64,158,255,.13);border-radius:8px;background:rgba(6,13,28,.5)}
+  .tok label{font-size:11px;color:#a9c0de;flex:0 0 82px;margin:0;white-space:nowrap}
+  .tok input[type=color]{width:28px;height:26px;padding:0;border:1px solid var(--border);
+    border-radius:6px;background:transparent;cursor:pointer;flex:0 0 28px}
+  .tok input[type=text]{flex:1;min-width:0;padding:5px 7px;font-size:11px;
+    font-family:Consolas,Monaco,Menlo,monospace}
+  .tok input[type=text]:focus{box-shadow:0 0 0 2px rgba(0,212,255,.13)}
+  .pvhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .pvhead select{flex:1;padding:7px 9px;font-size:11.5px}
+  .pvhead .btn{padding:7px 10px;font-size:11.5px}
+  .pvbox{border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff}
+  .pvbox iframe{width:100%;height:660px;border:none;display:block;background:#fff}
+  .pvfoot{font-size:10.5px;color:var(--muted);line-height:1.7;margin-top:9px}
+  .pvfoot b{color:var(--accent)}
+
+  /* ---------- toast ---------- */
+  .toast{position:fixed;right:22px;bottom:22px;z-index:200;padding:11px 18px;border-radius:10px;
+    font-size:12.5px;background:rgba(10,28,56,.96);border:1px solid var(--accent);
+    box-shadow:0 10px 34px rgba(0,0,0,.5);opacity:0;transform:translateY(10px);
+    transition:.25s;pointer-events:none}
+  .toast.show{opacity:1;transform:none}
+  .toast.err{border-color:var(--danger);color:#ffb3b3}
+  @media (max-width:860px){
+    .body{grid-template-columns:1fr}
+    aside{display:none}
+    .grid2,.grid3{grid-template-columns:1fr}
+    .tmeta{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="left">
+      <a class="navlink" href="/" data-ic="left">大屏</a>
+      <a class="navlink" href="/manage">文章管理</a>
+      <div class="logo">码</div>
+      <div><h1>系统设置</h1><div class="sub">SYSTEM SETTINGS · 内容运营台 内容运营台</div></div>
+    </div>
+    <div class="right">
+      <div class="state">当前主题 <b id="hdTheme">—</b> · <span id="hdDirty">已保存</span></div>
+      <button class="btn gh" onclick="loadAll()" data-ic="refresh">重新载入</button>
+      <button class="btn pri" onclick="saveAll()">保存全部设置</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside>
+      <div class="grp">配置分组</div>
+      <button class="navitem on" data-sec="content"><span class="nav-ic" data-ic="edit"></span>内容配置</button>
+      <button class="navitem" data-sec="gen"><span class="nav-ic" data-ic="spark"></span>生成与配图</button>
+      <button class="navitem" data-sec="pub"><span class="nav-ic" data-ic="external"></span>发布与凭据</button>
+      <button class="navitem" data-sec="theme"><span class="nav-ic" data-ic="layers"></span>文章主题</button>
+      <button class="navitem" data-sec="system"><span class="nav-ic" data-ic="chart"></span>系统与数据</button>
+      <div class="foot">
+        设置保存在 <b>articles/data/config.json</b> 与 <b>articles/data/themes.json</b>；微信公众号凭据单独存 <b>articles/data/secrets.json</b>（不随代码迁移）。<br>
+        定时任务（每日 09:00）每次运行前读取，保存后对下一次生成生效。<br>
+        <b>不会改动已生成的文章与公众号草稿。</b>
+      </div>
+    </aside>
+
+    <main>
+      <!-- 1 内容配置 -->
+      <section class="sec on" id="sec-content">
+        <div class="sec-h"><h2>内容配置</h2><p>决定定时任务写什么、写多长</p></div>
+        <div class="card">
+          <h3>选题与读者</h3>
+          <p class="desc">选题方向用于选题池；四大内容支柱的轮转进度由 articles/data/series_state.json 独立维护。</p>
+          <div class="fld" style="margin-bottom:14px">
+            <label>选题方向（回车添加，点 × 删除）</label>
+            <div class="tags" id="tagBox"></div>
+            <input id="tagInput" type="text" placeholder="例如：Spring Boot 实战，输入后按回车">
+          </div>
+          <div class="grid2">
+            <div class="fld"><label>目标读者</label><input id="cfg_audience" type="text">
+              <span class="hint">写入生成规范，影响行文深度与术语密度</span></div>
+            <div class="fld"><label>作者署名</label><input id="cfg_author" type="text">
+              <span class="hint">用于公众号草稿 author 字段</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>篇幅</h3>
+          <p class="desc">定时任务按此区间控制正文长度；下限建议不低于 1200 字，保证「有干货」。</p>
+          <div class="grid2">
+            <div class="fld"><label>字数下限</label>
+              <div class="num"><input id="cfg_wmin" type="number" min="200" max="20000" step="100">
+                <div class="stepper"><button onclick="stepNum('cfg_wmin',100)">▲</button><button onclick="stepNum('cfg_wmin',-100)">▼</button></div></div></div>
+            <div class="fld"><label>字数上限</label>
+              <div class="num"><input id="cfg_wmax" type="number" min="200" max="40000" step="100">
+                <div class="stepper"><button onclick="stepNum('cfg_wmax',100)">▲</button><button onclick="stepNum('cfg_wmax',-100)">▼</button></div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 生成与配图 -->
+      <section class="sec" id="sec-gen">
+        <div class="sec-h"><h2>生成与配图</h2><p>配图策略与图片风格</p></div>
+        <div class="card">
+          <h3>配图策略</h3>
+          <p class="desc">封面图必须生成；文中插图按需绘制（架构图 / 流程图用 SVG 转 PNG，不用 ASCII 框线）。</p>
+          <div class="grid2">
+            <div class="fld"><label>配图风格</label>
+              <input id="cfg_imageStyle" type="text" list="styleList">
+              <datalist id="styleList">
+                <option value="flat illustration"><option value="tech blueprint">
+                <option value="minimal geometric"><option value="isometric 3D">
+              </datalist>
+              <span class="hint">传给封面生成提示词，保证系列视觉统一</span></div>
+            <div class="fld"><label>主题标识（自动同步）</label>
+              <input id="cfg_themeName" class="readonly" type="text" readonly>
+              <span class="hint">由「文章主题」页启用的主题自动写入，供定时任务识别</span></div>
+          </div>
+          <div style="margin-top:16px" class="swrow">
+            <div class="tx"><b>跳过所有文中插图</b><span>开启后仅生成封面；适合纯代码解析类文章</span></div>
+            <div class="sw"><input type="checkbox" id="cfg_skipImages"><i></i></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>生成规范摘要（只读）</h3>
+          <p class="desc">以下规则写在定时任务 prompt 中，此处仅供核对；如需修改请告诉我。</p>
+          <div class="kv">
+            <div class="k">内容支柱</div><div class="v">A 实战工程 / B AI 工程化 / C 语言框架深挖 / D 排错避坑，按 series_state.json 轮转</div>
+            <div class="k">文章结构</div><div class="v">标题 ≤32 字 + 副标题 + 简介 ≤120 字 + 封面 + 可运行代码 + 架构说明 + 封装取舍</div>
+            <div class="k">代码规范</div><div class="v">pre&gt;code 带 language-xxx 标注，单行 ≤46 字符，发布器自动语法高亮</div>
+            <div class="k">归档路径</div><div class="v">articles/data/content/&lt;YYYY-MM&gt;/ 下，配图在同目录 assets/，index.json 路径带月份前缀</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 发布与凭据 -->
+      <section class="sec" id="sec-pub">
+        <div class="sec-h"><h2>发布与凭据</h2><p>草稿箱发布链路，不群发</p></div>
+        <div class="card">
+          <h3>发布开关</h3>
+          <p class="desc">关闭自动发布后，定时任务只生成文章，需到「文章管理」页手动点「一键发布」。</p>
+          <div class="swrow" style="margin-bottom:10px">
+            <div class="tx"><b>生成后自动建草稿</b><span>autoPublish · 走公众号原始接口 draft/add</span></div>
+            <div class="sw"><input type="checkbox" id="cfg_autoPublish"><i></i></div>
+          </div>
+          <div class="grid2" style="margin-top:14px">
+            <div class="fld"><label>发布目标</label>
+              <select id="cfg_publishTarget">
+                <option value="wechat">wechat · 公众号草稿箱</option>
+                <option value="none">none · 仅本地，不发布</option>
+              </select></div>
+            <div class="fld"><label>公众号原始 ID（可选）</label><input id="cfg_wechatAccountId" type="text">
+              <span class="hint">仅作记录，接口调用使用下方 AppId</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>接口凭据</h3>
+          <p class="desc">仅保存在本机 config.json，不会上传到任何第三方。AppSecret 默认隐藏，可点眼睛查看。</p>
+          <div class="grid2">
+            <div class="fld"><label>AppId</label><input id="cfg_appId" type="text"></div>
+            <div class="fld"><label>AppSecret</label>
+              <div class="secret"><input id="cfg_appSecret" type="password">
+                <button class="eye" id="eyeBtn" title="显示 / 隐藏" onclick="toggleSecret()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+                    <line id="eyeSlash" x1="3" y1="3" x2="21" y2="21" stroke="currentColor"/>
+                  </svg></button></div>
+              <span class="hint">微信公众平台 → 开发 → 基本配置</span></div>
+          </div>
+          <div style="margin-top:14px;font-size:11px;color:var(--warn);line-height:1.8">
+            <span data-ic="alert"></span> 原创声明：draft/add 接口不支持指定原创，需在公众号后台群发时手动勾选。<br>
+            <span data-ic="alert"></span> 本号为个人订阅号，无法申请微信认证，数据统计接口恒返回 48001（与代码、IP 白名单无关）。传播数据请用后台「内容分析」导出的 .xls 手动导入，结果是一次性快照、不会自动更新；不导入也不影响大屏的本地指标。
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 文章主题 -->
+      <section class="sec" id="sec-theme">
+        <div class="sec-h"><h2>文章主题</h2><p>多主题管理 · 22 个配色 token · 公众号版实时预览</p></div>
+        <div class="theme-wrap">
+          <div>
+            <div class="card">
+              <h3>主题库</h3>
+              <p class="desc">点卡片进入编辑，点「启用」设为当前主题。内置主题不可删除，可先「复制」再改色。</p>
+              <div class="tbar">
+                <span class="chip" id="activeChip">当前启用：—</span>
+                <span class="grow"></span>
+                <button class="btn" onclick="newTheme()">＋ 复制新建</button>
+                <button class="btn gh" onclick="resetTokens()" data-ic="refresh">恢复默认配色</button>
+              </div>
+              <div class="themes" id="themeGrid"></div>
+              <div class="tmeta">
+                <div class="fld"><label>主题名称</label><input id="thName" type="text" maxlength="24"></div>
+                <div class="fld"><label>备注</label><input id="thDesc" type="text" maxlength="80"></div>
+                <button class="btn d" id="delThemeBtn" onclick="deleteTheme()">删除主题</button>
+              </div>
+            </div>
+            <div class="card">
+              <h3>配色编辑</h3>
+              <p class="desc">改动即时反映到右侧预览；点「保存全部设置」后才写入 themes.json 并对新文章生效。</p>
+              <div id="tokenBox"></div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <h3>实时预览</h3>
+              <p class="desc">这里渲染的是公众号正文的最终内联样式，非网页版文章。</p>
+              <div class="pvhead">
+                <select id="pvArticle"><option value="">示例文章（含代码 / 列表 / 引用）</option></select>
+                <button class="btn" onclick="refreshPreview(true)" data-ic="refresh">刷新</button>
+              </div>
+              <div class="pvbox"><iframe id="pvFrame" title="主题预览"></iframe></div>
+              <div class="pvfoot">
+                预览源：<b id="pvLabel">示例文章</b><br>
+                主题作用于 <b>publish_wechat.py</b> 的公众号渲染；定时任务生成网页版 HTML 时也会读取当前主题色。<br>
+                历史文章与已建草稿<b>不会被改写</b>，如需重发请在文章管理页手动操作。
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 系统与数据 -->
+      <section class="sec" id="sec-system">
+        <div class="sec-h"><h2>系统与数据</h2><p>只读运行状态 + 数据入口</p></div>
+        <div class="card">
+          <h3>运行状态</h3>
+          <p class="desc">数据来自本地文件与接口探测，不做任何臆造。</p>
+          <div class="kv" id="sysKv"><div class="k">载入中…</div><div class="v">—</div></div>
+        </div>
+        <div class="card">
+          <h3>内容支柱进度</h3>
+          <p class="desc">series_state.json 记录轮转，避免「东一下西一下」的散乱选题。</p>
+          <div class="kv" id="seriesKv"><div class="k">载入中…</div><div class="v">—</div></div>
+        </div>
+        <div class="card">
+          <h3>配置项清单</h3>
+          <p class="desc">config.json 中所有键均已在上方分组可视化，无隐藏配置。</p>
+          <div id="keyChips" style="display:flex;flex-wrap:wrap;gap:7px"></div>
+        </div>
+        <div class="card">
+          <h3>数据快捷操作</h3>
+          <p class="desc">传播表现数据优先用公众号后台导出的 .xls / .xlsx，零成本绕开接口权限。</p>
+          <div class="tbar">
+      <a class="btn" href="/?view=reach">前往传播表现 <span data-ic="right"></span></a>
+      <button class="btn gh" onclick="quickRefresh()" data-ic="refresh">刷新接口数据</button>
+            <button class="btn gh" onclick="quickClear()">清除导入数据</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+/* 矢量图标：内联 SVG path，无外部依赖，颜色继承 currentColor */
+const ICONS={
+  check:'<path d="M20 6 9 17l-5-5"/>', x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  alert:'<path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5M12 17.5v.5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  download:'<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/>',
+  key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9 2 2-2 2 1 1-3 3-1-1-2 2"/>',
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>',
+  refresh:'<path d="M20 11a8 8 0 0 0-14-5L4 8m0-5v5h5M4 13a8 8 0 0 0 14 5l2-2m0 5v-5h-5"/>',
+  left:'<path d="M19 12H5m0 0 6-6m-6 6 6 6"/>', right:'<path d="M5 12h14m0 0-6-6m6 6-6 6"/>',
+  up:'<path d="M12 19V5m0 0-6 6m6-6 6 6"/>', down:'<path d="M12 5v14m0 0 6-6m-6 6-6-6"/>',
+  edit:'<path d="M4 20h4l11-11-4-4L4 16v4Zm10-14 4 4"/>',
+  external:'<path d="M7 17 17 7m0 0H8m9 0v9"/>',
+  dot:'<circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>',
+  chart:'<path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/>',
+  spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/>',
+  layers:'<path d="M12 3 3 8l9 5 9-5-9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/>'
+};
+function icon(n,cls=""){
+  return `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]||""}</svg>`;
+}
+function injectIcons(){
+  document.querySelectorAll("[data-ic]").forEach(e=>{
+    e.insertAdjacentHTML("afterbegin",icon(e.dataset.ic)+" ");
+    e.removeAttribute("data-ic");
+  });
+}
+injectIcons();
+let cfg={}, themes={active:"",themes:[]}, schema={groups:[],defaults:{}},
+    selected="", articles=[], dirty=false, pvTimer=null, sys={};
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function toast(msg,err){const t=$("toast");t.textContent=msg;t.className="toast show"+(err?" err":"");
+  clearTimeout(t._t);t._t=setTimeout(()=>t.className="toast",2600);}
+function markDirty(){dirty=true;$("hdDirty").textContent="有未保存改动";$("hdDirty").style.color="var(--warn)";}
+function markClean(){dirty=false;$("hdDirty").textContent="已保存";$("hdDirty").style.color="";}
+async function api(m,u,b){const o={method:m,headers:{}};
+  if(b!==undefined){o.headers["Content-Type"]="application/json";o.body=JSON.stringify(b);}
+  const r=await fetch(u,o);let d;try{d=await r.json();}catch(e){d={};}
+  if(!r.ok)throw new Error(d.error||("HTTP "+r.status));return d;}
+function stepNum(id,d){const e=$(id);const v=Math.max(Number(e.min)||0,(Number(e.value)||0)+d);
+  e.value=v;markDirty();}
+function toggleSecret(){const e=$("cfg_appSecret");const show=e.type==="password";
+  e.type=show?"text":"password";$("eyeSlash").style.display=show?"none":"";}
+
+/* ---------- 配置表单 ---------- */
+let topicTags=[];
+function renderTags(){$("tagBox").innerHTML=topicTags.map((t,i)=>
+  `<span class="tag">${esc(t)}<b data-i="${i}" title="删除">×</b></span>`).join("")||'<span style="font-size:11px;color:var(--muted);padding:4px">暂无选题</span>';
+  $("tagBox").querySelectorAll("b[data-i]").forEach(b=>b.onclick=()=>{topicTags.splice(Number(b.dataset.i),1);renderTags();markDirty();});}
+$("tagInput").addEventListener("keydown",e=>{
+  if(e.key!=="Enter")return;e.preventDefault();
+  const v=e.target.value.trim();if(!v)return;
+  v.split(/[，,]/).map(x=>x.trim()).filter(Boolean).forEach(x=>{if(!topicTags.includes(x))topicTags.push(x);});
+  e.target.value="";renderTags();markDirty();});
+
+function fillConfig(){
+  topicTags=Array.isArray(cfg.topics)?cfg.topics.slice():[];renderTags();
+  $("cfg_audience").value=cfg.audience||"";
+  $("cfg_author").value=cfg.author||"";
+  const wr=cfg.wordRange||[1200,2500];$("cfg_wmin").value=wr[0];$("cfg_wmax").value=wr[1];
+  $("cfg_imageStyle").value=cfg.imageStyle||"";
+  $("cfg_skipImages").checked=!!cfg.skipImages;
+  $("cfg_autoPublish").checked=!!cfg.autoPublish;
+  $("cfg_publishTarget").value=cfg.publishTarget||"wechat";
+  if(!$("cfg_publishTarget").value)$("cfg_publishTarget").value="wechat";
+  $("cfg_appId").value=cfg.appId||"";$("cfg_appSecret").value=cfg.appSecret||"";
+  $("cfg_appSecret").type="password";$("eyeSlash").style.display="";
+  $("cfg_wechatAccountId").value=cfg.wechatAccountId||"";
+  $("cfg_themeName").value=cfg.themeName||"";
+  $("cfg_themeName").placeholder="保存后自动写入："+((activeTheme()||{}).name||"—");
+}
+function collectConfig(){
+  cfg.topics=topicTags.slice();
+  cfg.audience=$("cfg_audience").value.trim();
+  cfg.author=$("cfg_author").value.trim();
+  cfg.wordRange=[Number($("cfg_wmin").value)||1200,Number($("cfg_wmax").value)||2500];
+  cfg.imageStyle=$("cfg_imageStyle").value.trim();
+  cfg.skipImages=$("cfg_skipImages").checked;
+  cfg.autoPublish=$("cfg_autoPublish").checked;
+  cfg.publishTarget=$("cfg_publishTarget").value;
+  cfg.appId=$("cfg_appId").value.trim();cfg.appSecret=$("cfg_appSecret").value.trim();
+  cfg.wechatAccountId=$("cfg_wechatAccountId").value.trim();
+  const t=activeTheme();cfg.themeName=t?t.name:"";
+  $("cfg_themeName").value=cfg.themeName;
+}
+document.querySelectorAll("main input,main select").forEach(el=>{
+  el.addEventListener("input",markDirty);el.addEventListener("change",markDirty);});
+
+/* ---------- 主题 ---------- */
+function editing(){return themes.themes.find(t=>t.id===selected)||themes.themes[0]||{tokens:{}};}
+function activeTheme(){return themes.themes.find(t=>t.id===themes.active);}
+function swatch(t){return ["accent","accent2","heroBg","codeBg","summaryBg"]
+  .map(k=>`<i style="background:${esc((t.tokens||{})[k]||"#223")}"></i>`).join("");}
+function renderThemes(){
+  $("themeGrid").innerHTML=themes.themes.map(t=>{
+    const isSel=t.id===selected,isAct=t.id===themes.active;
+    return `<div class="tcard ${isSel?"sel":""}" data-id="${esc(t.id)}">
+      <div class="swatches">${swatch(t)}</div>
+      <div class="nm">${esc(t.name)}${isAct?'<span class="on">'+icon("dot")+' 启用中</span>':""}</div>
+      <div class="ds">${esc(t.desc||"自定义主题")}</div>
+      <div class="ops">
+        <button class="${isAct?"act":""}" data-op="activate">${isAct?"已启用":"启用"}</button>
+        <button data-op="edit">编辑</button>
+      </div></div>`;}).join("");
+  $("themeGrid").querySelectorAll(".tcard").forEach(el=>el.onclick=e=>{
+    const op=e.target.dataset.op;const id=el.dataset.id;
+    if(op==="activate"){themes.active=id;markDirty();}
+    selected=id;fillThemeMeta();renderThemes();renderTokens();refreshPreview();
+    updateHeader();
+  });
+  $("activeChip").textContent="当前启用："+((activeTheme()||{}).name||"—");
+  const cur=editing();$("delThemeBtn").disabled=!!cur.builtin||themes.themes.length<=1;
+}
+function fillThemeMeta(){
+  const t=editing();$("thName").value=t.name||"";$("thDesc").value=t.desc||"";
+  $("thName").disabled=!!t.builtin;$("thDesc").disabled=!!t.builtin;
+}
+$("thName").addEventListener("input",e=>{const t=editing();if(!t.builtin){t.name=e.target.value;markDirty();renderThemes();}});
+$("thDesc").addEventListener("input",e=>{const t=editing();if(!t.builtin){t.desc=e.target.value;markDirty();}});
+
+function renderTokens(){
+  const t=editing();
+  $("tokenBox").innerHTML=(schema.groups||[]).map(g=>{
+    const rows=g.tokens.map(k=>{
+      const v=(t.tokens||{})[k.key]||schema.defaults[k.key]||"#000000";
+      const isColor=k.type==="color";
+      const picker=isColor?`<input type="color" data-k="${k.key}" value="${esc(v)}">`:"";
+      return `<div class="tok"><label>${esc(k.label)}</label>${picker}
+        <input type="text" data-k="${k.key}" value="${esc(v)}" spellcheck="false"></div>`;}).join("");
+    return `<div class="tokgrp"><h4>${esc(g.label)}</h4><div class="toks">${rows}</div></div>`;
+  }).join("");
+  $("tokenBox").querySelectorAll("input[data-k]").forEach(el=>el.addEventListener("input",()=>{
+    const k=el.dataset.k;const val=el.value.trim();
+    // 同步同一 token 的 color / text 两个控件
+    $("tokenBox").querySelectorAll(`input[data-k="${k}"]`).forEach(x=>{if(x!==el)x.value=val;});
+    const t=editing();t.tokens=t.tokens||{};t.tokens[k]=val;
+    markDirty();refreshPreview();renderThemes();
+  }));
+}
+function newTheme(){
+  const src=editing();const n=themes.themes.filter(t=>!t.builtin).length+1;
+  const id="custom-"+Date.now().toString(36);
+  themes.themes.push({id,name:"自定义主题 "+n,desc:"由「"+(src.name||"主题")+"」复制",
+    builtin:false,tokens:Object.assign({},schema.defaults,src.tokens||{})});
+  selected=id;fillThemeMeta();renderThemes();renderTokens();refreshPreview();markDirty();
+  toast("已复制新建主题，可自由改色与重命名");
+}
+function deleteTheme(){
+  const t=editing();if(t.builtin)return;
+  if(!confirm(`确定删除主题「${t.name}」？删除后需点「保存全部设置」才会写入文件。`))return;
+  themes.themes=themes.themes.filter(x=>x.id!==t.id);
+  if(themes.active===t.id)themes.active=themes.themes[0].id;
+  selected=themes.active;fillThemeMeta();renderThemes();renderTokens();refreshPreview();markDirty();
+  toast("已删除（保存后生效）");
+}
+function resetTokens(){
+  const t=editing();t.tokens=Object.assign({},schema.defaults);
+  renderTokens();renderThemes();refreshPreview();markDirty();toast("已恢复默认配色");
+}
+
+/* ---------- 预览 ---------- */
+function refreshPreview(now){
+  clearTimeout(pvTimer);
+  const run=async()=>{
+    try{
+      const body={tokens:editing().tokens||{}};
+      const v=$("pvArticle").value;if(v!=="")body.articleId=Number(v);
+      const d=await api("POST","/api/themes/preview",body);
+      $("pvFrame").srcdoc=d.html;$("pvLabel").textContent=d.label||"示例文章";
+    }catch(e){toast("预览失败: "+e.message,true);}
+  };
+  if(now)run();else pvTimer=setTimeout(run,320);
+}
+$("pvArticle").addEventListener("change",()=>refreshPreview(true));
+
+/* ---------- 系统面板 ---------- */
+async function fillSystem(){
+  try{
+    const [s,st]=await Promise.all([api("GET","/api/system"),api("GET","/api/stats")]);
+    sys=s;
+    const a=s.apiStatus||{};
+    $("sysKv").innerHTML=[
+      ["文章总数",s.articles+" 篇"],
+      ["当前主题",(activeTheme()||{}).name||s.activeTheme||"—"],
+      ["传播数据源",s.statsSource==="api"?"微信统计接口":s.statsSource==="csv"?"后台导出文件":"仅本地指标"],
+      ["接口权限",a.authorized?"已授权":("未授权 "+(a.code||"—"))],
+      ["最近一次探测",a.checkedAt||"未探测"],
+      ["服务目录",s.serverDir||"—"],
+      ["定时任务","每日 09:00 · ACTIVE（生成 + 自动建草稿）"],
+    ].map(([k,v])=>`<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>`).join("");
+    const pl=(s.series&&(s.series.pillars||s.series))||{};
+    const rows=Object.keys(pl).length?Object.entries(pl).map(([k,v])=>{
+      const name=String(v&&(v.name||v.label)||k);
+      const cnt=v&&(v.count!=null?v.count:(v.written!=null?v.written:"—"));
+      return `<div class="k">支柱 ${esc(k)}</div><div class="v">${esc(name)} · 已写 ${esc(cnt)} 篇</div>`;}).join("")
+      :`<div class="k">—</div><div class="v">series_state.json 暂无支柱统计</div>`;
+    $("seriesKv").innerHTML=rows;
+    $("keyChips").innerHTML=(s.configKeys||[]).map(k=>`<span class="chip ok">${esc(k)}</span>`).join("");
+  }catch(e){$("sysKv").innerHTML=`<div class="k">读取失败</div><div class="v">${esc(e.message)}</div>`;}
+}
+async function quickRefresh(){
+  try{const d=await api("POST","/api/stats/refresh",{force:true});
+    toast(d.ok?"接口数据已刷新":"接口未授权，可导入后台 xls");fillSystem();}
+  catch(e){toast("刷新失败: "+e.message,true);}
+}
+async function quickClear(){
+  if(!confirm("清除已导入的后台数据？本地指标不受影响。"))return;
+  try{await api("POST","/api/stats/clear",{});toast("已清除导入数据");fillSystem();}
+  catch(e){toast("清除失败: "+e.message,true);}
+}
+
+/* ---------- 保存 / 载入 ---------- */
+function updateHeader(){const t=activeTheme();$("hdTheme").textContent=t?t.name:"—";}
+async function saveAll(){
+  try{
+    collectConfig();
+    if(Number(cfg.wordRange[0])>Number(cfg.wordRange[1]))throw new Error("字数下限不能大于上限");
+    await api("PUT","/api/config",cfg);
+    const saved=await api("PUT","/api/themes",{active:themes.active,themes:themes.themes});
+    themes={active:saved.active,themes:saved.themes};
+    selected=saved.active;fillThemeMeta();renderThemes();renderTokens();
+    updateHeader();fillSystem();refreshPreview(true);markClean();
+    toast("设置已保存，下一次生成/发布自动生效");
+  }catch(e){toast("保存失败: "+e.message,true);}
+}
+async function loadAll(){
+  try{
+    const [c,t,a]=await Promise.all([api("GET","/api/config"),api("GET","/api/themes"),api("GET","/api/articles")]);
+    cfg=c;themes={active:t.active,themes:t.themes};schema=t.schema||{groups:[],defaults:{}};
+    articles=a;selected=t.active;
+    $("pvArticle").innerHTML='<option value="">示例文章（含代码 / 列表 / 引用）</option>'+
+      a.map(x=>`<option value="${x.id}">${esc(x.date)} · ${esc(x.title).slice(0,26)}</option>`).join("");
+    fillConfig();fillThemeMeta();renderThemes();renderTokens();updateHeader();
+    refreshPreview(true);fillSystem();markClean();
+  }catch(e){toast("载入失败: "+e.message,true);}
+}
+
+/* ---------- 导航（支持 ?sec=theme 深链） ---------- */
+function goSec(key){
+  const btn=document.querySelector(`.navitem[data-sec="${key}"]`);
+  if(!btn||!$("sec-"+key))return;
+  document.querySelectorAll(".navitem").forEach(x=>x.classList.remove("on"));btn.classList.add("on");
+  document.querySelectorAll(".sec").forEach(s=>s.classList.remove("on"));
+  $("sec-"+key).classList.add("on");
+  if(key==="theme")refreshPreview(true);
+  if(key==="system")fillSystem();
+}
+document.querySelectorAll(".navitem").forEach(b=>b.onclick=()=>goSec(b.dataset.sec));
+window.addEventListener("beforeunload",e=>{if(dirty){e.preventDefault();e.returnValue="";}});
+loadAll().then(()=>{
+  const s=new URLSearchParams(location.search).get("sec");
+  if(s)goSec(s);
+});
+</script>
+</body>
+</html>
