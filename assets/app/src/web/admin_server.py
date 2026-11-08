@@ -811,7 +811,8 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 import base64
                 import mp_session
-                import stats_provider
+                # stats_provider 已在模块级导入：此处不可再局部 import，否则会把 do_POST
+                # 内的 stats_provider 变成局部变量，令 /api/stats/refresh 等分支 UnboundLocalError
                 import strategy_engine
                 days = int(body.get("days", 30) or 30)
                 end_ts = body.get("endTs") or None

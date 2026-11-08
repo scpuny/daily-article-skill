@@ -378,6 +378,25 @@
   .rule-tag{display:block;font-size:10px;font-weight:600;line-height:1.25;margin-top:2px;white-space:nowrap}
   .rule-tag.ok{color:var(--ok)} .rule-tag.no{color:var(--danger)}
   .top-stack .kvlist{max-height:none;flex:1}
+  /* STEP 步骤条：图形化路径，说明仅悬浮可见 */
+  .stepbar{display:flex;align-items:flex-start;width:100%;gap:0;margin:4px 0 10px}
+  .stepbar .sp{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;position:relative;cursor:help}
+  .stepbar .sp::before{content:"";position:absolute;top:9px;left:-50%;width:100%;height:2px;background:rgba(64,158,255,.22)}
+  .stepbar .sp:first-child::before{display:none}
+  .stepbar .sp.done::before,.stepbar .sp.now::before{background:linear-gradient(90deg,var(--accent),var(--cyan))}
+  .stepbar .dot{position:relative;z-index:1;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+    font-size:10px;font-weight:800;color:var(--muted);background:#0d1e3a;border:1px solid rgba(64,158,255,.35)}
+  .stepbar .sp.done .dot{background:var(--accent);color:#04122b;border-color:var(--accent)}
+  .stepbar .sp.now .dot{background:var(--cyan);color:#04122b;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,.18)}
+  .stepbar .lb{margin-top:5px;font-size:10px;color:#a8c2e8;text-align:center;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  /* 口径徽标：界面只留 ?，完整解释悬浮可见 */
+  .qmark{display:inline-grid;place-items:center;width:13px;height:13px;border-radius:50%;
+    border:1px solid rgba(64,158,255,.45);color:var(--cyan);font-size:9px;font-weight:700;
+    cursor:help;margin-left:4px;vertical-align:middle}
+  .mini-grid .m{position:relative;cursor:help}
+  .mini-grid .m.has-hint{border-color:rgba(0,212,255,.34)}
+  .mini-grid .m.has-hint::after{content:"?";position:absolute;top:1px;right:3px;font-size:8px;color:var(--cyan);opacity:.75}
 </style>
 </head>
 <body>
@@ -479,7 +498,7 @@
     </div>
     <div class="field"><label class="switch"><input id="cfg_skipImages" type="checkbox"> 跳过配图（仅文字）</label></div>
     <div class="field"><label class="switch"><input id="cfg_autoPublish" type="checkbox"> 定时任务自动发布</label>
-      <div style="font-size:11.5px;color:var(--muted);margin-top:4px">关闭后，定时任务只生成草稿，由你在文章管理页手动点「一键发布」。</div></div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px">关闭时：仅建草稿<span class="qmark" title="关闭后，定时任务只生成草稿，由你在文章管理页手动点「一键发布」">?</span></div></div>
     <div class="actions">
       <button class="btn g" onclick="closeConfig()">取消</button>
       <button class="btn p" onclick="saveConfig()">保存配置</button>
@@ -491,13 +510,15 @@
 <div class="mask" id="impMask">
   <div class="cfg">
     <h3>导入公众号数据</h3>
-    <p class="tip">公众号后台 →「内容分析 / 图文分析」→ 导出数据，直接选择导出的 <b>.xls</b> 文件即可，<b>无需另存为 CSV</b>。推荐导<b>「图文分析 → 单篇」</b>（表头含「标题」）；「渠道日报」没有标题列，只能画趋势。<br>
-    同时兼容 .xlsx、.csv、.tsv、UTF-16 / GBK 文本，以及「HTML 表格另存成 .xls」的伪 Excel。自动识别「阅读人数、分享人数、收藏人数、在看人数、日期、标题」等列，导出文件顶部的说明行会自动跳过。<br>
-    这是绕开「数据统计接口未授权」的零成本方案，导入后「传播表现」视图立即显示真实图表。<br>
-    导入结果是<b>一次性快照，不会自动更新</b>；个人订阅号无法申请微信认证，接口自动同步不可用。想更新时重新导出一次即可，不导入也不影响大屏的本地指标。<br>
-    <b>带标题的「单篇」导出会同步写入写作策略反馈台账</b>，下一次定时任务据此调整选题、标题句式与话术；也可以直接把文件放进 <code>~/Downloads</code>，效果相同。<br>
-    <b>单篇「数据明细（…）.xls」只补收藏 / 在看 / 点赞</b>，按文件名里的标题逐篇配对；同一个文件重复导入会提示「已是最新」，不会覆盖其它文章的数据。</p>
-    <div class="field"><label>选择导出文件（可一次多选；多个「数据明细」逐篇独立补全，互不影响）</label>
+    <div class="stepbar">
+      <div class="sp done" title="公众号后台 → 内容分析 / 图文分析 → 导出数据；推荐「图文分析 → 单篇」（表头含「标题」）"><span class="dot">✓</span><span class="lb">导出单篇</span></div>
+      <div class="sp now" title="选择导出文件，可一次多选；.xls/.xlsx/.csv/.tsv、UTF-16/GBK、伪 Excel 均兼容"><span class="dot">2</span><span class="lb">选择文件</span></div>
+      <div class="sp" title="导入后传播表现视图立即显示真实图表，并同步写入写作策略反馈台账"><span class="dot">3</span><span class="lb">导入刷新</span></div>
+    </div>
+    <details class="st-more"><summary>格式与口径<span class="cnt">?</span></summary><div class="inner"><div class="st-note">
+      兼容 .xls/.xlsx/.csv/.tsv / UTF-16 / GBK / 伪 Excel，自动识别表头。「渠道日报」无标题列只能画趋势。快照不自动更新，重导再导入即可刷新；「数据明细」按标题逐篇补互动字段，重复导入不覆盖。
+    </div></div></details>
+    <div class="field"><label>选择导出文件（可多选）</label>
       <input id="csvFile" type="file" accept=".xls,.xlsx,.csv,.tsv,.txt" multiple></div>
     <div class="actions">
       <button class="btn g" onclick="closeImport()">取消</button>
@@ -564,9 +585,11 @@ function barRows(items,mean){
 }
 function progressCard(title,cur,goal,hint,name){
   const g=Math.max(1,Number(goal)||1), c=Math.max(0,Number(cur)||0);
+  const short=Array.isArray(hint)?hint[0]:String(hint||"");
+  const tip=Array.isArray(hint)?hint[1]:short;
   return `<div class="st-prog"><div class="hd">${icon(name||"chart")}${esc(title)}<b>${c} / ${g}</b></div>
     <div class="track"><i style="width:${Math.min(100,c/g*100).toFixed(1)}%"></i></div>
-    <div class="st-note">${esc(hint)}</div></div>`;
+    <div class="st-note" title="${esc(tip)}">${esc(short)}${Array.isArray(hint)?qmark(tip):""}</div></div>`;
 }
 function weightBars(own){
   const dims=[["titlePattern","标题句式"],["hookType","开头钩子"],["pillar","内容支柱"]];
@@ -597,6 +620,60 @@ function sampleRows(){
   return (strategySamples||[]).map(s=>({k:s.title||"—",v:Number(s.score)||0,
                                        n:String(s.date||"").slice(5)}))
     .sort((a,b)=>b.v-a.v);
+}
+
+/* ===== 指标派生：全部由现有接口数据现算，不新增后端字段 ===== */
+function pct(a,b){const x=Number(a)||0,y=Number(b)||0;return y?+(x/y*100).toFixed(1):null;}
+function gapTo(cur,need){return Math.max(0,(Number(need)||0)-(Number(cur)||0));}
+function hoursSince(s){if(!s)return null;const t=new Date(String(s).replace(' ','T')).getTime();
+  return Number.isFinite(t)?Math.max(0,Math.round((Date.now()-t)/3.6e6)):null;}
+function corr(xs,ys){const n=Math.min(xs.length,ys.length);if(n<2)return null;
+  const mx=xs.reduce((a,b)=>a+b,0)/n,my=ys.reduce((a,b)=>a+b,0)/n;
+  let num=0,dx=0,dy=0;for(let i=0;i<n;i++){const a=xs[i]-mx,b=ys[i]-my;num+=a*b;dx+=a*a;dy+=b*b;}
+  return (dx&&dy)?+(num/Math.sqrt(dx*dy)).toFixed(2):null;}
+function spread(m){const v=Object.values(m||{}).map(Number).filter(Number.isFinite);
+  return v.length>1?+(Math.max(...v)-Math.min(...v)).toFixed(2):null;}
+function median(a){return a.length?(a.length%2?a[(a.length-1)/2]:(a[a.length/2-1]+a[a.length/2])/2):null;}
+/* 指标格：数值 + 短标签；口径只进 title（格子右上角 ?） */
+function cells(items){return `<div class="mini-grid">${items.map(([k,v,hint])=>
+  `<div class="m${hint?' has-hint':''}" title="${esc(String(k))}：${esc(String(v))}${hint?' · '+esc(String(hint)):''}"><b>${esc(String(v))}</b><span>${esc(String(k))}</span></div>`).join("")}</div>`;}
+function qmark(t){return `<span class="qmark" title="${esc(t)}">?</span>`;}
+/* STEP 步骤条：图形化路径，label ≤8 字，说明进 title */
+function stepBar(steps){return `<div class="stepbar">${steps.map((s,i)=>
+  `<div class="sp ${s.state||''}" title="${esc(s.tip||s.label)}"><span class="dot">${s.state==='done'?'✓':(i+1)}</span><span class="lb">${esc(s.label)}</span></div>`).join("")}</div>`;}
+function derive(){
+  const S=stats||{},L=S.local||{},R=S.remoteSummary||{},st=strategy||{};
+  const daily=S.daily||[],arts=S.articles||[],tl=L.timeline||[];
+  const n=Number(st.sampleSize)||0,pr=st.pairing||{},dc=pr.detailCoverage||{};
+  const reads=Object.fromEntries(daily.map(d=>[d.date,Number(d.read)||0]));
+  const pairs=tl.filter(d=>reads[d.date]!=null);
+  const scores=(strategySamples||[]).map(x=>Number(x.score)||0).sort((a,b)=>a-b);
+  const g=Number((st.effectiveness||{}).globalMean)||0;
+  const words=((L.articles)||[]).map(a=>Number(a.words)||0).sort((a,b)=>a-b);
+  const real=(strategySamples||[]).filter(x=>!/^backfill/i.test(String(x.strategyVersion||""))).length;
+  const attr=(st.attribution||{}).matrix||[];
+  const lifts=attr.map(x=>Number(x.lift)).filter(Number.isFinite);
+  const dh=dataHealth||{},iw=dh.info||{};
+  return {
+    dailyN:daily.length,artN:arts.length,freshH:hoursSince(S.updatedAt),
+    zeroRead:arts.filter(a=>!Number(a.read)).length,cover:pct(arts.length,L.total),
+    apiCode:(S.apiStatus||{}).code??"未探测",epN:(S.endpoints||[]).length,
+    r:corr(pairs.map(d=>d.count),pairs.map(d=>reads[d.date])),pairDays:pairs.length,
+    zeroPost:tl.filter(d=>!d.count).length,peakPost:Math.max(0,...tl.map(d=>d.count)),
+    n,gapWarm:gapTo(n,8),gapStrong:gapTo(n,20),pairRate:pct(pr.paired,pr.total),
+    detailRate:pct(dc.filled,dc.total),versionH:hoursSince(st.builtAt),
+    funnel:[arts.length,(strategyCounts||{}).feedback,pr.paired,n],
+    wSpread:spread((st.own||{}).titlePattern),
+    above:scores.filter(v=>v>g).length,aboveRate:pct(scores.filter(v=>v>g).length,scores.length),
+    scoreMax:scores.length?scores[scores.length-1]:null,scoreMin:scores.length?scores[0]:null,
+    wMedian:median(words),wP90:words.length?words[Math.floor(words.length*.9)]:null,
+    wMax:words.length?words[words.length-1]:null,
+    top1Share:pct(((R.top||[])[0]||{}).read,R.read),
+    real,gapReal:gapTo(real,3),attrN:attr.length,
+    avgLift:lifts.length?+(lifts.reduce((a,b)=>a+b,0)/lifts.length).toFixed(1):null,
+    orphanLocal:(iw.localWithoutStats||[]).length,orphanRemote:(iw.statsWithoutLocal||[]).length,
+    dhIssues:(dh.issues||[]).length
+  };
 }
 
 // ---------- clock ----------
@@ -776,7 +853,7 @@ function renderMid(){
   if(view==="attr"){
     const a=(strategy||{}).attribution||{matrix:[],summary:{}};
     const s=a.summary||{};
-    $("midT1").innerHTML="归因说明"+badge(`指令 ${fmt((a.matrix||[]).length)} 条`);
+    $("midT1").innerHTML="归因指标"+badge(`指令 ${fmt((a.matrix||[]).length)} 条`);
     $("midT2").innerHTML="约束归因矩阵"+`<span class="h2-badge">${icon("check")}${fmt(s.significantPos||0)} ${icon("x")}${fmt(s.significantNeg||0)}</span>`;
     $("midT3").innerHTML="命中 / 控制下钻"+badge(`${fmt((a.matrix||[]).length)} 行可下钻`);
     ["midB1","midB2","midB3"].forEach(id=>$(id).className="body st-body");
@@ -795,7 +872,7 @@ function renderMid(){
     renderDonut();renderTrend();renderPillars();
   }else{
     const dd=(stats&&stats.daily)||[],R=(stats&&stats.remoteSummary)||null;
-    $("midT1").innerHTML="数据接入状态"+badge(`${dd.length} 天日粒度`);
+    $("midT1").innerHTML="数据接入指标"+badge(`${dd.length} 天日粒度`);
     $("midT2").innerHTML="近 7 日阅读趋势"+badge(dd.length?`合计 ${fmt(sumBy(dd,d=>d.read))} 阅读`:"暂无快照");
     $("midT3").innerHTML="文章表现 TOP"+badge(R?`${fmt(R.articleCount||0)} 条明细`:"接口未授权");
     $("midB1").style.alignItems="stretch";$("midB2").style.alignItems="stretch";$("midB3").style.alignItems="stretch";
@@ -844,6 +921,7 @@ function stWeights(map,markLast){
 }
 
 function renderStrategy(){
+  const M=derive();
   const s=strategy||{},c=strategyCounts||{},conf=s.confidence||"cold";
   const confText={cold:"冷启动",warm:"积累中",strong:"可信"}[conf]||conf;
   const kv=(k,v)=>`<div class="k">${k}</div><div class="v">${v}</div>`;
@@ -856,8 +934,11 @@ function renderStrategy(){
     kv("维度覆盖",`句式 ${fmt(cov.titlePattern||0)} · 钩子 ${fmt(cov.hookType||0)} · 支柱 ${fmt(cov.pillar||0)}`)+
     kv("台账规模",`特征 ${fmt(c.features||0)} · 反馈 ${fmt(c.feedback||0)} · 信号 ${fmt(c.signals||0)}`)+
     `</div></div>`;
-  left+=`<div class="st-sec">闭环说明<span class="st-inline" style="float:right;margin:0">评分口径见右栏「更多」</span></div><div class="st-note">
-    首步落实 constraints、末步登记本轮特征；导出「图文分析 → 单篇」放进 ~/Downloads 或点「导入数据」即自动吸收。样本 &lt;8 篇只给冷启动基线。</div>`;
+  left+=`<div class="st-sec">闭环进度${qmark("首步落实 constraints，末步登记本轮特征；导出「图文分析 → 单篇」放进 ~/Downloads 或点「导入数据」自动吸收。样本 <8 篇只给冷启动基线")}</div>`+cells([
+    ["硬约束",`${(s.constraints||[]).length} 条`],["待验假设",`${((strategy||{}).hypotheses||[]).length} 条`],
+    ["距 warm",`${M.gapWarm} 篇`],["距 strong",`${M.gapStrong} 篇`],
+    ["版本距今",`${M.versionH??"—"} h`],["权重极差",M.wSpread??"—"]
+  ]);
   const n=Number(s.sampleSize)||0;
   left+=`<div class="st-sec">置信度刻度</div><div class="st-conf">
     <div class="track"><i style="width:${Math.min(100,n/20*100).toFixed(1)}%"></i><u style="left:40%"></u></div>
@@ -865,7 +946,7 @@ function renderStrategy(){
   $("midB1").innerHTML=left;
 
   const cs=s.constraints||[],fb=stFeedback();
-  let mid=`<div class="st-note" style="margin:0 0 8px">以下 ${cs.length} 条由策略引擎生成，写作时<b style="color:var(--cyan)">逐条落实</b>；自有样本优先于外部信号。</div>`+
+  let mid=`<div class="st-sec">本轮硬约束 ${cs.length} 条${qmark("由策略引擎生成，写作时逐条落实；自有样本权重优先于外部信号")}</div>`+
     (cs.length?`<ul class="st-cons">${cs.map((x,i)=>`<li><span class="n">${i+1}</span><span>${esc(x)}</span></li>`).join("")}</ul>`
       :'<div class="st-note">策略文件尚未生成；下次 09:00 定时任务会自动生成。</div>');
   mid+=`<div class="st-sec">约束依据 · 维度覆盖<span style="float:right;font-weight:400;letter-spacing:0;color:var(--muted)">样本：导出 ${fmt(fb.total)} → 入库 ${fmt(c.feedback||0)} → 配对 ${fmt(fb.matched)} / 台账外 ${fmt(fb.unmatched)}</span></div>`+miniCells([
@@ -884,8 +965,11 @@ function renderStrategy(){
   // R7 配对诊断（数据质量，喂给所有策略）
   const pr=strategy.pairing||{paired:0,total:0,unpaired:[],reasons:{}};
   const prate=pr.total?Math.round(pr.paired/pr.total*100):0;
-  let diag=`<div class="st-sec">配对诊断（R7）</div><div class="st-card"><div class="t">导出 ${fmt(pr.total)} 篇 · 已配对 ${fmt(pr.paired)} · 配对率 ${prate}%</div>`+
-    `<div class="st-note" style="margin-top:6px">配对靠标题归一化 + 字符集合兜底（Jaccard≥0.6）。未配对文章不参与句式归因，但数据未丢弃。</div>`;
+  const up=pr.unpaired||[],nMis=up.filter(r=>r.reason==="title_mismatch").length,nNoF=up.length-nMis;
+  let diag=`<div class="st-sec">配对诊断${qmark("标题归一化 + 字符集合兜底（Jaccard≥0.6）；未配对文章不参与句式归因，但数据未丢弃")}</div>`+cells([
+    ["导出",`${fmt(pr.total)} 篇`],["已配对",`${fmt(pr.paired)} 篇`],["配对率",`${prate}%`],
+    ["标题不符",`${fmt(nMis)} 篇`],["无特征",`${fmt(nNoF)} 篇`],["样本",`${M.n} 篇`]
+  ]);
   if(pr.unpaired&&pr.unpaired.length){
     diag+=`<details class="st-more"><summary>未配对 ${pr.unpaired.length} 篇<span class="cnt">${fmt(pr.unpaired.length)}</span></summary><div class="inner"><div class="st-fb"><div class="r hd"><span>标题</span><span>日期</span><span>原因</span></div>`;
     diag+=pr.unpaired.map(r=>`<div class="r"><span class="t" title="${esc(r.title||"")}">${esc((r.title||"—"))}</span><span>${esc(r.date||"—")}</span><span class="${r.reason==='title_mismatch'?'no':'ok'}">${r.reason==='title_mismatch'?'标题不匹配':'无特征'}</span></div>`).join('');
@@ -893,7 +977,11 @@ function renderStrategy(){
   }
   // 单篇明细补全率：收藏/在看/点赞只在文章详情的单篇导出里，批量 total 导出不含
   const dc=pr.detailCoverage||{filled:0,total:0,missing:[]};
-  diag+=`<div class="st-note" style="margin-top:8px">单篇互动补全 ${fmt(dc.filled)}/${fmt(dc.total)} 篇 · 收藏 / 在看 / 点赞只在文章详情的单篇「下载数据明细」里，批量导出不含；未补全按 0 计。</div>`;
+  diag+=`<div class="st-sec">明细补全${qmark("收藏 / 在看 / 点赞只在单篇「下载数据明细」里，批量 total 导出不含；未补全按 0 计")}</div>`+cells([
+    ["已补",`${fmt(dc.filled)} 篇`],["应补",`${fmt(dc.total)} 篇`],["补全率",M.detailRate!=null?M.detailRate+"%":"—"],
+    ["待补",`${fmt((dc.missing||[]).length)} 篇`],["按0计",`${fmt(Math.max(0,(Number(dc.total)||0)-(Number(dc.filled)||0)))} 篇`],
+    ["补齐差",`${gapTo(dc.filled,dc.total)} 篇`]
+  ]);
   if(dc.missing&&dc.missing.length){
     diag+=`<details class="st-more"><summary>待补明细 ${dc.missing.length} 篇<span class="cnt">${fmt(dc.missing.length)}</span></summary><div class="inner"><div class="st-fb"><div class="r hd"><span>标题</span><span>日期</span><span>状态</span></div>`;
     diag+=dc.missing.map(r=>`<div class="r"><span class="t" title="${esc(r.title||"")}">${esc(r.title||"—")}</span><span>${esc(r.date||"—")}</span><span class="no">待补</span></div>`).join('');
@@ -902,9 +990,10 @@ function renderStrategy(){
   diag+=`</div>`;
   right=diag;
   if(!hasOwn){
-    right+=`<div class="st-card"><div class="t">自有样本尚未成形</div><div class="st-note" style="margin-top:0">
-      当前配对 ${fmt(s.sampleSize||0)} 篇，样本 &lt;8 篇不做统计推断。标题句式 / 开头钩子 / 内容支柱的权重，
-      会在带标题的「图文分析 → 单篇」数据回来后自动出现；本轮按中栏冷启动基线执行。</div></div>`;
+    right+=`<div class="st-sec">样本缺口${qmark("样本 <8 篇不做统计推断；带标题的「图文分析 → 单篇」数据回来后自动生成句式 / 钩子 / 支柱权重，本轮按冷启动基线执行")}</div>`+cells([
+      ["当前配对",`${M.n} 篇`],["距 warm",`${M.gapWarm} 篇`],["距 strong",`${M.gapStrong} 篇`],
+      ["置信度",confText],["特征台账",`${fmt(c.features||0)} 条`],["反馈",`${fmt(c.feedback||0)} 条`]
+    ]);
   }else{
     right+=`<div class="st-sec">自有样本 · 标题句式<span style="float:right;font-weight:400;letter-spacing:0">橙色 = 最弱项，写作时避免</span></div>`+stWeights(own.titlePattern,true);
     right+=`<div class="st-sec">自有样本 · 开头钩子</div>`+stWeights(own.hookType,true);
@@ -919,22 +1008,33 @@ function renderStrategy(){
   right+=`<details class="st-more"><summary>更多 · 样本明细与实验记录<span class="cnt">样本 ${fb.total} 条 / 实验 ${rec.length} 条</span></summary><div class="inner">
     <div class="st-mini">反馈样本明细（导出 ${fb.total} 条 · 已入库 ${fmt(c.feedback||0)} 条 · 配对 ${fb.matched} / 台账外 ${fb.unmatched}）</div>
     ${fb.html}
-    <div class="st-inline">上表逐条来自「图文分析 → 单篇」导出；「台账外」= 本地 index.json 无对应文章，按设计不参与句式归因，数据并未丢弃。</div>
     ${ins.length?`<div class="st-mini">引擎说明</div><ul class="st-insights">${ins.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
-    <div class="st-note">评分口径：${esc(s.scoreDef||"—")}；黏性以分享 / 收藏为准，不追绝对阅读量；累计阅读按发表天数衰减，消除老文章天然读得多的假象。</div>
-    <div class="st-mini">样本积累路径</div>
-    <ul class="st-cons">
-      <li><span class="n">1</span><span>公众号后台导一次「图文分析 → 单篇」（表头含「标题」），放进 ~/Downloads 或点上方「导入数据」；一次覆盖全部已发表文章。</span></li>
-      <li><span class="n">2</span><span>每篇写完自动登记 titlePattern / hookType / strategyVersion / hypothesis，形成可验证的实验台账。</span></li>
-      <li><span class="n">3</span><span>配对样本 ≥8 篇后出现句式权重，≥20 篇置信度转「可信」；自有权重始终优先于外部信号。</span></li>
-    </ul>
+    <div class="st-sec">样本漏斗${qmark("导出条数 → 反馈台账入库 → 与本地文章配对 → 进入策略样本；每级显示转化率")}</div>
+    ${stepBar([
+      {label:"导出",state:"done",tip:"公众号后台导一次「图文分析 → 单篇」（表头含标题），放进 ~/Downloads 或点「导入数据」"},
+      {label:"入库",state:(c.feedback||0)?"done":"now",tip:"每篇写完自动登记 titlePattern / hookType / strategyVersion / hypothesis，形成可验证的实验台账"},
+      {label:"配对",state:(M.n>0)?"done":"",tip:"配对样本 ≥8 篇后出现句式权重，≥20 篇置信度转「可信」；自有权重优先于外部信号"},
+      {label:"可归因",state:(M.n>=8)?"done":"",tip:"进入句式 / 钩子 / 支柱权重计算，参与 R1 归因"}
+    ])}
+    ${cells([
+      ["导出",`${fmt(fb.total)} 条`],["入库",`${fmt(c.feedback||0)} 条`],["配对",`${fmt(M.n)} 篇`],
+      ["入库率",pct(c.feedback,fb.total)!=null?pct(c.feedback,fb.total)+"%":"—"],
+      ["配对率",pct(M.n,c.feedback)!=null?pct(M.n,c.feedback)+"%":"—"],
+      ["台账外",`${fmt(fb.unmatched)} 条`,"台账外 = 本地 index.json 无对应文章，按设计不参与句式归因，数据未丢弃"]
+    ])}
+    <div class="st-sec">评分口径${qmark(String(s.scoreDef||"—"))}</div>${cells([
+      ["权重极差",M.wSpread??"—"],["高于均值",`${M.above} 篇`],["占比",M.aboveRate!=null?M.aboveRate+"%":"—"],
+      ["最高分",fmt(M.scoreMax)],["最低分",fmt(M.scoreMin)],
+      ["全局均值",fmt(Number((((strategy||{}).effectiveness)||{}).globalMean)||0)]
+    ])}
     <div class="st-mini">最近实验记录（展示最近 ${rec.length} 条 / 台账共 ${fmt(c.features||0)} 条）</div>`;
   if(rec.length){
     right+=`<div class="st-recent">`+rec.map(r=>`<div class="it" title="版本 ${esc(r.strategyVersion||"—")} · 假设 ${esc(r.hypothesis||"—")}">
       <b>${esc(r.date||"—")}</b><span>${esc(r.title||"—")}</span>
       <em>${esc(r.titlePattern||"—")} / ${esc(r.hookType||"—")}</em></div>`).join("")+`</div>`;
   }else{
-    right+=`<div class="st-note">暂无实验记录；每篇定时任务写完后会自动追加，可回溯「本轮假设是否被验证」。</div>`;
+    right+=cells([["实验记录","0 条"],["距首条","1 条"],["台账",`${fmt(c.features||0)} 条`],
+      ["待验假设",`${fmt(((strategy||{}).hypotheses||[]).length)} 条`],["回溯粒度","按篇"],["状态","待写入"]]);
   }
   right+=`</div></details>`;
   $("midB3").innerHTML=right;
@@ -942,6 +1042,7 @@ function renderStrategy(){
 
 // ---------- 策略演进视图（R2/R3/R4） ----------
 function renderEvolve(){
+  const M=derive();
   const s=strategy||{}, hist=s.history||[], eff=s.effectiveness||{versions:[]},
         hyps=s.hypotheses||[], vr=s.verifiedRules||[];
   // 左栏顶部：全链路数据体检（真源对齐状态 + 一键自愈）
@@ -953,11 +1054,18 @@ function renderEvolve(){
       left+='<div class="st-cons">'+issues.map(x=>`<li><span class="n">${icon('alert')}</span><span>${esc(x.message||x.code)}（${fmt(x.count||0)}）</span></li>`).join('')+'</div>';
       left+='<button class="tbtn" style="margin-top:8px;width:100%" onclick="doRepair()">一键对齐台账</button>';
     }else{
-      left+=`<div class="st-note" style="color:var(--ok)">${icon('check')} 文章清单 / 特征台账 / 反馈台账 / KPI 快照 / 定格状态 / 策略版本 已对齐 · ${esc(String(dh.checkedAt||'').slice(11,19))}</div>`;
+      left+=`<div class="st-sec">链路对齐${qmark("文章清单 / 特征台账 / 反馈台账 / KPI 快照 / 定格状态 / 策略版本 共 6 环，全部一致才计 100%")}</div>`+cells([
+        ["对齐率","100%"],["环节","6 / 6"],["待修复",`${issues.length} 项`],
+        ["检查于",esc(String(dh.checkedAt||'').slice(11,19))],["特征",`${fmt(c.features||0)} 条`],["反馈",`${fmt(c.feedback||0)} 条`]
+      ]);
     }
     const iw=dh.info||{}, noStat=(iw.localWithoutStats||[]).length, noLocal=(iw.statsWithoutLocal||[]).length;
     if(noStat||noLocal)
-      left+=`<div class="st-note" style="margin-top:6px">正常孤儿：本地 ${noStat} 篇后台暂无数据（未群发/未出数）、后台 ${noLocal} 篇本地文章已删；均不参与归因。</div>`;
+      left+=`<div class="st-sec">正常孤儿${qmark("本地有文章但后台暂无数据（未群发/未出数），或后台有数据但本地文章已删；均不参与归因")}</div>`+cells([
+        ["本地无数据",`${noStat} 篇`],["后台无本地",`${noLocal} 篇`],["孤儿合计",`${noStat+noLocal} 篇`],
+        ["孤儿率",pct(noStat+noLocal,c.articles)!=null?pct(noStat+noLocal,c.articles)+"%":"—"],
+        ["可归因",`${fmt(c.samples||0)} 篇`],["体检项",`${issues.length} 项`]
+      ]);
   }else{
     left+='<div class="st-note">体检接口未返回，刷新页面可重试。</div>';
   }
@@ -980,7 +1088,9 @@ function renderEvolve(){
                     ["stale","建议复核","var(--warn)","alert"],["rejected","建议下线","var(--danger)","x"]];
   if(!allRules.length){
     left+=progressCard("可沉淀规则",0,1,
-      "当前 0 条实测显著指令；R1 归因出现命中组/控制组各 ≥3 篇的非回填样本后，build 自动提炼带 lift 与证据的规则。","clock");
+      ["还差 3+3 篇实测样本","当前 0 条实测显著指令；R1 归因出现命中组/控制组各 ≥3 篇的非回填样本后，build 自动提炼带 lift 与证据的规则。"],"clock")
+      +cells([["待写","0 条"],["距显著","3 / 3 篇"],["实测样本",`${M.real} 篇`],
+        ["距阈值",`${M.gapReal} 篇`],["平均 lift",M.avgLift!=null?M.avgLift+"%":"—"],["指令行",`${M.attrN} 条`]]);
   }else{
     for(const [key,label,col,icn] of ruleStates){
       const list=pgroups[key]||[];
@@ -996,19 +1106,30 @@ function renderEvolve(){
     }
     if((pgroups.pending||[]).length)
       left+='<button class="tbtn" style="margin-top:10px;width:100%" onclick="writeSkillRules()">写入 SKILL（预览后确认）</button>';
-    left+='<div class="st-note" style="margin-top:8px">「建议复核 / 建议下线」仅提示，不会自动改动 SKILL.md；移除规则请人工编辑。</div>';
+    const g0=s.rulePool||{},gp=g0.groups||{},tot=(g0.rules||[]).length;
+    left+=`<div class="st-sec">规则状态${qmark("「建议复核 / 建议下线」仅提示，不会自动改动 SKILL.md；移除规则请人工编辑")}</div>`+cells([
+      ["总数",`${tot} 条`],["待写",`${(gp.pending||[]).length} 条`],["已写",`${(gp.written||[]).length} 条`],
+      ["待写占比",pct((gp.pending||[]).length,tot)!=null?pct((gp.pending||[]).length,tot)+"%":"—"],
+      ["建议复核",`${(gp.stale||[]).length} 条`],["建议下线",`${(gp.rejected||[]).length} 条`]
+    ]);
   }
   $("midB1").innerHTML=left;
 
   // 中栏：真实样本黏性榜（feedback + _score 现算）+ 版本有效性（R2，有数据才显示）
   const g=Number(eff.globalMean)||0, rows=sampleRows();
   let mid=`<div class="st-sec">真实样本黏性榜 · ${rows.length} 篇</div>`;
-  mid+=`<div class="st-note" style="margin:0 0 6px">按 log1p(阅读/√发表天数)×(1+0.6×互动/√阅读) 计算；实色高于全局均值 ${g.toFixed(2)}，灰色低于。</div>`;
-  mid+=rows.length?barRows(rows,g):'<div class="st-note">暂无配对样本；导入带标题的「图文分析 → 单篇」后自动出现。</div>';
+  mid+=`<div class="st-sec">黏性分布${qmark("按 log1p(阅读/√发表天数)×(1+0.6×互动/√阅读) 计算；实色高于全局均值 "+g.toFixed(2)+"，灰色低于")}</div>`+cells([
+    ["样本",`${rows.length} 篇`],["高于均值",`${M.above} 篇`],["占比",M.aboveRate!=null?M.aboveRate+"%":"—"],
+    ["最高",fmt(M.scoreMax)],["最低",fmt(M.scoreMin)],["全局均值",g.toFixed(2)]
+  ]);
+  mid+=rows.length?barRows(rows,g):cells([["样本","0 篇"],["距首篇","1 篇"],["距 warm",`${M.gapWarm} 篇`],
+    ["距 strong",`${M.gapStrong} 篇`],["实测样本",`${M.real} 篇`],["状态","待导入"]]);
   mid+='<div class="st-sec" style="margin-top:12px">约束有效性追踪（R2）</div>';
   if(!eff.versions||!eff.versions.length){
     mid+=progressCard("真实实验版本",0,2,
-      "当前样本均为历史回填；策略版本发布后再积累 2 版带表现的文章，即可按版本对比平均黏性、连续两轮低于均值自动降级。","clock");
+      ["还差 2 版","当前样本均为历史回填；策略版本发布后再积累 2 版带表现的文章，即可按版本对比平均黏性、连续两轮低于均值自动降级。"],"clock")
+      +cells([["版本数","0 版"],["距阈值","2 版"],["实测样本",`${M.real} 篇`],
+        ["距显著",`${M.gapReal} 篇`],["降级版","0 版"],["全局均值",g.toFixed(2)]]);
   }else{
     mid+='<table class="st-hits"><thead><tr><th>版本</th><th style="width:46px">样本</th><th style="width:56px">均值</th><th style="width:50px">全局</th><th style="width:50px">差值</th><th style="width:50px">状态</th></tr></thead><tbody>';
     mid+=eff.versions.map(v=>{
@@ -1027,13 +1148,17 @@ function renderEvolve(){
   const real=(strategySamples||[]).filter(x=>!/^backfill/i.test(String(x.strategyVersion||""))).length;
   let right='<div class="st-sec">数据完备度（距首个显著结论）</div>';
   right+=progressCard("写作特征 ↔ 表现数据配对",pr.paired||0,pr.total||1,
-    "配对成功的文章才进入策略样本；标题不一致时按字符集合相似度兜底。","chart");
+    ["配对率 "+(M.pairRate!=null?M.pairRate+"%":"—"),"配对成功的文章才进入策略样本；标题不一致时按字符集合相似度兜底。"],"chart");
   right+=progressCard("单篇互动明细补全",dc.filled||0,dc.total||1,
-    "收藏 / 在看 / 点赞来自单篇明细；满 7 天定格后每篇只拉一次。","download");
+    ["补全率 "+(M.detailRate!=null?M.detailRate+"%":"—"),"收藏 / 在看 / 点赞来自单篇明细；满 7 天定格后每篇只拉一次。"],"download");
   right+=progressCard("真实实验样本（非回填）",real,3,
-    "策略版本发布后写的文章，命中组 / 控制组各 ≥3 篇才给显著性结论；当前回填样本只作观测。","clock");
+    ["还差 "+M.gapReal+" 篇","策略版本发布后写的文章，命中组 / 控制组各 ≥3 篇才给显著性结论；当前回填样本只作观测。"],"clock");
+  right+=cells([["配对率",M.pairRate!=null?M.pairRate+"%":"—"],["补全率",M.detailRate!=null?M.detailRate+"%":"—"],
+    ["实测样本",`${M.real} 篇`],["距显著",`${M.gapReal} 篇`],
+    ["配对缺口",`${gapTo(pr.paired,pr.total)} 篇`],["明细缺口",`${gapTo(dc.filled,dc.total)} 篇`]]);
   right+='<div class="st-sec" style="margin-top:10px">假设验证闭环（R3）</div>';
-  if(!hyps.length) right+='<div class="st-note">暂无可验证假设；写作末步登记 hypothesis 后会在此出现。</div>';
+  if(!hyps.length) right+=cells([["假设","0 条"],["距首条","1 条"],["台账",`${fmt((strategyCounts||{}).features||0)} 条`],
+    ["实测样本",`${M.real} 篇`],["距显著",`${M.gapReal} 篇`],["状态","待登记"]]);
   else{
     right+='<table class="st-hits"><thead><tr><th style="width:64px">日期</th><th>假设 / 目标特征</th><th style="width:46px">命中</th><th style="width:46px">控制</th><th style="width:42px">提升</th><th style="width:32px">状态</th></tr></thead><tbody>';
     right+=hyps.map(h=>{
@@ -1072,21 +1197,26 @@ async function writeSkillRules(){
 // ---------- 归因矩阵视图（R1） ----------
 function attrSelect(i){attrSelected=i;renderAttr();}
 function renderAttr(){
+  const M=derive();
   const a=(strategy||{}).attribution||{matrix:[],summary:{}};
   const m=a.matrix||[], s=a.summary||{};
   if(m.length&&(attrSelected<0||attrSelected>=m.length))attrSelected=0;   // 默认下钻首行
   // 左栏：归因口径 + 概览 + 三维实测权重（全部来自 strategy.own）
-  let left='<div class="st-sec">归因口径</div><div class="st-note">把每条「优先 / 避免」类指令拆成命中组 vs 控制组，比对黏性得分 lift%。仅真实样本（非回填）参与结论；单组&lt;3 篇或仅回填支撑不臆造显著性。</div>';
-  left+=miniCells([
+  let left=`<div class="st-sec">归因概览${qmark("每条「优先 / 避免」指令拆成命中组 vs 控制组，比对黏性得分 lift%；仅真实样本（非回填）参与结论，单组 <3 篇或仅回填支撑不臆造显著性")}</div>`;
+  left+=cells([
     ["指令数",fmt(m.length)],["显著正",fmt(s.significantPos||0)],["显著负",fmt(s.significantNeg||0)],
-    ["仅回填",fmt(s.backfillOnly||0)],["待观察",fmt(s.wait||0)],["真实样本",s.hasReal?"有":"无"]]);
-  left+=`<div class="st-inline" style="margin:8px 0 2px">${icon("alert")} 当前为回填观测，不给显著性结论 ${icon("clock")} 待真实实验样本</div>`;
+    ["仅回填",fmt(s.backfillOnly||0)],["待观察",fmt(s.wait||0)],["真实样本",s.hasReal?"有":"无"],
+    ["平均 lift",M.avgLift!=null?M.avgLift+"%":"—"],["实测样本",`${M.real} 篇`],["距阈值",`${M.gapReal} 篇`]]);
+  left+=`<div class="st-sec" style="margin-top:8px">结论状态 <span class="st-flag">${s.hasReal?"实测":"观测"}</span></div>`;
   left+='<div class="st-sec" style="margin-top:10px">三维度实测权重</div>'+
-    weightBars((strategy||{}).own)+'<div class="st-inline">数值为收缩后黏性得分，来自已配对样本；第一名高亮。</div>';
+    weightBars((strategy||{}).own)+`<div class="st-sec">权重极差 ${M.wSpread??"—"}${qmark("数值为收缩后黏性得分，来自已配对样本；第一名高亮")}</div>`;
   $("midB1").innerHTML=left;
   // 中栏：矩阵表。真实结论显示后端 lift，回填状态显示本地分组观测值（明确标注非结论）
   if(!m.length){
-    $("midB2").innerHTML='<div class="st-note">暂无可解析的指令型约束（标题句式 / 开头钩子 / 内容支柱 + 优先 / 避免）。当前策略可能只含冷启动基线。</div>';
+    $("midB2").innerHTML=`<div class="st-sec">矩阵缺口${qmark("可解析指令来自标题句式 / 开头钩子 / 内容支柱 + 优先 / 避免；当前策略可能只含冷启动基线")}</div>`+cells([
+      ["指令行","0 条"],["距首行","1 条"],["配对样本",`${M.n} 篇`],
+      ["距 warm",`${M.gapWarm} 篇`],["实测样本",`${M.real} 篇`],["状态","待 build"]
+    ]);
   }else{
     const stMap={ok:"check",no:"x",backfill:"alert",wait:"clock"};
     const pgrp=((strategy||{}).rulePool||{}).groups||{};
@@ -1116,15 +1246,17 @@ function renderAttr(){
         <td style="color:${col};font-weight:700">${stb}${tag}</td></tr>`;
     }).join('');
     $("midB2").innerHTML=`<table class="st-hits"><thead><tr><th>类型</th><th>目标</th><th style="width:44px">方向</th><th style="width:52px">命中</th><th style="width:52px">控制</th><th style="width:58px">差值/lift</th><th style="width:52px">样本</th><th style="width:34px">状态</th></tr></thead><tbody>${rows}</tbody></table>`+
-      `<div class="st-note">${icon("alert")} 命中 / 控制列：状态为「仅回填」时是 ${(strategySamples||[]).length} 篇回填样本按维度分组的观测均值与得分差，<b>不参与 R1 显著性判定</b>；出现实测结论的行改显示后端 lift%。点击任意行在右栏下钻文章清单。</div>`;
+      `<div class="st-sec">口径${qmark("命中 / 控制列：状态为「仅回填」时是 "+(strategySamples||[]).length+" 篇回填样本按维度分组的观测均值与得分差，不参与 R1 显著性判定；出现实测结论的行改显示后端 lift%。点击任意行在右栏下钻文章清单")}</div>`;
   }
   renderAttrDrill();
 }
 function renderAttrDrill(){
+  const M=derive();
   const a=(strategy||{}).attribution||{matrix:[]};
   const m=a.matrix||[];
   if(attrSelected<0||attrSelected>=m.length){
-    $("midB3").innerHTML='<div class="st-note">暂无可下钻的指令行；导入带标题的「图文分析 → 单篇」并 build 策略后自动生成。</div>';
+    $("midB3").innerHTML=cells([["可下钻","0 行"],["距首行","1 行"],["导入明细",`${M.artN} 条`],
+      ["配对",`${M.n} 篇`],["距 warm",`${M.gapWarm} 篇`],["状态","待 build"]]);
     return;
   }
   const x=m[attrSelected];
@@ -1133,7 +1265,7 @@ function renderAttrDrill(){
   const ha=(real?(x.hitArticles||[]):obs.hit).slice(0,10);
   const ca=(real?(x.ctrlArticles||[]):obs.ctrl).slice(0,10);
   const hm=real?x.conformMean:obs.hitMean, cm=real?x.ctrlMean:obs.ctrlMean;
-  const dir=x.direction==="优先"?"优先符合（命中组 = 符合该指令）":"避免（命中组 = 不符合该指令）";
+  const dir=x.direction==="优先"?"优先用":"避免用";
   const list=arr=>arr.length?'<div class="st-recent">'+arr.map(r=>
     `<div class="it"><b>${(Number(r.score)||0).toFixed(2)}</b><span title="${esc(r.title||"")}">${esc(String(r.title||"—").slice(0,28))}</span></div>`
   ).join("")+'</div>':'<div class="st-note">该组暂无样本</div>';
@@ -1141,8 +1273,12 @@ function renderAttrDrill(){
   html+=`<div class="st-inline">${real?icon("check")+" 真实实验样本结论":icon("alert")+" 回填观测（非显著性结论）"}<span class="st-flag">${real?"实测":"观测"}</span></div>`;
   html+=`<div class="st-mini">命中组（${real?(x.nConform||0):obs.hit.length} 篇 · 平均 ${hm!=null?Number(hm).toFixed(2):"—"}）</div>`+list(ha);
   html+=`<div class="st-mini">控制组（${real?(x.nCtrl||0):obs.ctrl.length} 篇 · 平均 ${cm!=null?Number(cm).toFixed(2):"—"}）</div>`+list(ca);
-  if(x.status==="backfill") html+=`<div class="st-note">${icon("clock")} 该指令目前仅由回填样本支撑，无真实实验结论；持续积累真实群发数据后自动点亮。</div>`;
-  if(x.status==="wait") html+=`<div class="st-note">真实样本单组不足 3 篇，结论待观察；积累更多非回填样本后自动判定。</div>`;
+  if(x.status==="backfill"||x.status==="wait")
+    html+=`<div class="st-sec">结论缺口${qmark(x.status==="backfill"?"该指令目前仅由回填样本支撑，无真实实验结论；持续积累真实群发数据后自动点亮。":"真实样本单组不足 3 篇，结论待观察；积累更多非回填样本后自动判定。")}</div>`+cells([
+      ["命中组",`${real?(x.nConform||0):obs.hit.length} 篇`],["控制组",`${real?(x.nCtrl||0):obs.ctrl.length} 篇`],
+      ["距阈值",`${gapTo(Math.min(real?(x.nConform||0):obs.hit.length,real?(x.nCtrl||0):obs.ctrl.length),3)} 篇`],
+      ["实测样本",`${M.real} 篇`],["差值",obs.delta!=null?obs.delta.toFixed(2):"—"],["状态",x.status==="wait"?"待观察":"仅回填"]
+    ]);
   $("midB3").innerHTML=html;
 }
 
@@ -1165,7 +1301,7 @@ function renderDonut(){
   $("donut").innerHTML=svg+`<div class="donut-legend">
     <div><span class="dot" style="background:linear-gradient(135deg,#2f80ed,#00d4ff)"></span>已建草稿 <b>${pub}</b></div>
     <div><span class="dot" style="background:rgba(255,255,255,.18)"></span>待建草稿 <b>${unpub}</b></div>
-    <div style="font-size:11px;color:#5f7396;margin-top:10px;max-width:130px;line-height:1.6">草稿 ≠ 群发，故群发统计接口无对应数据</div></div>`;
+    <div style="font-size:11px;color:#5f7396;margin-top:10px;max-width:130px;line-height:1.6">草稿 ≠ 群发${qmark("草稿不等于群发，故群发统计接口无对应数据")}</div></div>`;
 }
 
 function renderTrend(){
@@ -1210,37 +1346,28 @@ function renderPillars(){
 
 // 传播视图：无数据时不画假图，显示明确状态与接入路径
 function renderGuide(){
-  const s=stats||{},a=s.apiStatus||{},eps=s.endpoints||[];
+  const s=stats||{},a=s.apiStatus||{},eps=s.endpoints||[],M=derive();
   const good=s.source!=="none";
   const last=(s.daily||[]).reduce((m,d)=>d.date>m?d.date:m,"");
   const msg=String(a.message||"尚未探测接口权限");
   let html=`<div class="stack"><div class="status-card ${a.authorized?'good':''}">
-    <div class="t">${good?(s.source==="api"?"已接入公众号统计接口":"传播数据快照（手动导入）"):"微信统计接口暂不可用"}</div>
+    <div class="t">${good?(s.source==="api"?"已接入统计接口":"传播数据快照"):"统计接口不可用"}</div>
     <div class="m" title="${esc(msg)}">${esc(msg.length>42?msg.slice(0,42)+"…":msg)}</div>
-    <div class="sub">数据源：<b style="color:#46e6ff">${s.source==="api"?"datacube API":(s.source==="csv"?"后台导出 XLS（快照）":"仅本地")}</b>
-      ${last?" · 截至 "+esc(last):""} · 其余指标本地实时计算</div></div>`;
-  if(good){
-    html+=`<div class="steps">
-      <div class="step"><span class="n">${icon("check")}</span><span>已载入 ${fmt((s.daily||[]).length)} 天日粒度数据、${fmt((s.articles||[]).length)} 篇文章明细。</span></div>
-      ${(s.source==="csv"&&!a.authorized)?'<div class="step" title="这是手动导入的一次性快照，不会自动更新。个人订阅号无法申请微信认证，datacube 接口恒返回 48001；需要更新时，后台重新导出 .xls 后点「导入数据」即可。"><span class="n">i</span><span>一次性快照不自动更新；重新导出 .xls 后点「导入数据」即可刷新。</span></div>':""}
-    </div>`;
-  }else if(!a.authorized){
-    html+=`<div class="steps">
-      <div class="step"><span class="n">i</span><span>本号为个人订阅号，<b>无法申请微信认证</b>，datacube 统计接口恒返回 48001，接口自动同步不可用（与代码、IP 白名单无关）。</span></div>
-      <div class="step"><span class="n">1</span><span>想看传播数据：公众号后台「内容分析」导出 .xls → 右上「导入数据」，一次性快照即可长期显示。</span></div>
-      <div class="step"><span class="n">2</span><span>不导入也不影响大屏：内容生产视图的篇数、字数、连续创作、封面率、草稿等指标均由本地数据实时计算。</span></div>
-    </div>`;
-  }else{
-    html+=`<div class="steps"><div class="step"><span class="n">1</span><span>接口已授权，点「检查接口」拉取近 7 日数据；若无数据说明近期没有群发文章。</span></div></div>`;
-  }
-  html+=`<div class="ep-t">已适配 ${eps.length} 个图文数据接口${a.authorized?"":"（当前账号全部返回 48001）"}</div>`+
-    `<div class="eplist">${eps.map(e=>`<div class="eprow"><span>${esc(e.name)}</span><code>${esc(e.path.split('/').pop())}</code></div>`).join("")}</div>`;
-  const dd=(s.daily)||[],aa=(s.articles)||[];
-  html+=`<div class="st-sec">快照概况</div>`+miniCells([
-    ["日粒度",`${dd.length} 天`],["文章明细",`${aa.length} 条`],["数据截至",last||"—"],
-    ["数据源",s.source==="csv"?"后台导出":(s.source==="api"?"统计接口":"仅本地")],
-    ["接口状态",a.authorized?"已授权":(a.code?String(a.code):"未探测")],
-    ["快照时间",String(s.updatedAt||"—").slice(0,10)]])+`</div>`;
+    <div class="sub">数据源：<b style="color:#46e6ff">${s.source==="api"?"datacube API":(s.source==="csv"?"后台导出 XLS":"仅本地")}</b>${last?" · 截至 "+esc(last):""}</div></div>`;
+  html+=stepBar([
+    {label:"导出单篇",state:good?"done":"now",tip:"公众号后台 → 内容分析 / 图文分析 → 导出「单篇」（表头含标题）；也可放进 ~/Downloads"},
+    {label:"导入快照",state:good?"done":"",tip:"点右上「导入数据」选择导出的 .xls，一次性快照立即显示真实图表"},
+    {label:"看指标",state:good?"now":"",tip:"传播表现视图展示阅读 / 互动 / 篇均 / 发文×阅读相关系数；本地指标始终实时计算"}
+  ]);
+  html+=`<div class="st-sec">快照健康度${qmark("日粒度天数、文章明细条数、快照距今小时数、零阅读篇数、明细覆盖率、接口错误码；覆盖率 = 明细条数 / 本地文章数")}</div>`+cells([
+    ["日粒度",`${M.dailyN} 天`],["明细",`${M.artN} 条`],["距今",`${M.freshH??"—"} h`],
+    ["零阅读",`${M.zeroRead} 篇`],["覆盖率",M.cover!=null?M.cover+"%":"—"],["接口码",M.apiCode]
+  ]);
+  html+=`<div class="st-sec">接口探测${qmark("已适配接口数、权限码、是否授权、最近探测时间；个人订阅号恒返回 48001，与代码和 IP 白名单无关")}</div>`+cells([
+    ["已适配",`${M.epN} 个`],["授权",a.authorized?"是":"否"],["错误码",M.apiCode],
+    ["探测于",String(a.checkedAt||"—").slice(11,19)],["数据截至",last||"—"],["快照",String(s.updatedAt||"—").slice(0,10)]
+  ]);
+  html+=`<details class="st-more"><summary>已适配接口清单<span class="cnt">${M.epN}</span></summary><div class="inner"><div class="eplist">${eps.map(e=>`<div class="eprow"><span>${esc(e.name)}</span><code>${esc(e.path.split('/').pop())}</code></div>`).join("")}</div></div></details></div>`;
   $("midB1").innerHTML=html;
 }
 
@@ -1261,8 +1388,11 @@ function renderReachTrend(){
     });
     const svg=`<svg width="100%" height="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${bars}${labels}</svg>`;
     $("midB2").style.flexDirection="column";
+    const M=derive();
     $("midB2").innerHTML=chartSum([["基线","近 14 日发文"],["合计",`${fmt(sumBy(tl,d=>d.count))} 篇`]])+
-      `<div class="reach-note"><b>本地发文节奏（基线）</b> · 灰色虚线柱 = 近 14 日发文篇数。接入接口 / 导入数据后这里换成每日阅读人数曲线，并与发文节奏对照，检验「发得多 ≠ 读得多」。</div>`+svg;
+      cells([["发文×阅读 r",M.r??"样本不足","按日期对齐发文篇数与阅读人数后的 Pearson 相关系数；|r| 越接近 1 越相关"],
+        ["对齐天数",`${M.pairDays} 天`],["零发文日",`${M.zeroPost} 天`],
+        ["发文峰值",`${M.peakPost} 篇`],["零阅读",`${M.zeroRead} 篇`],["距今",`${M.freshH??"—"} h`]])+svg;
     return;
   }
   $("midB2").style.flexDirection="row";
@@ -1279,8 +1409,10 @@ function renderReachTrend(){
     labels+=`<text x="${x+bw/2}" y="${H-padB+17}" text-anchor="middle" fill="#7f93b8" font-size="9">${esc((d.date||"").slice(5))}</text>`;});
   const tR=sumBy(daily,d=>d.read),pkD=peakOf(daily,d=>d.read);
   const inter=sumBy(daily,d=>d.share)+sumBy(daily,d=>d.fav)+sumBy(daily,d=>d.like);
+  const M=derive();
   $("midB2").innerHTML=chartSum([["合计",fmt(tR)],["日均",fmt(Math.round(tR/Math.max(daily.length,1)))],
-    ["峰值",`${String(pkD.date||"—").slice(5)} ${fmt(pkD.read||0)}`],["互动",fmt(inter)]])+
+    ["峰值",`${String(pkD.date||"—").slice(5)} ${fmt(pkD.read||0)}`],["互动",fmt(inter)],
+    ["发文×阅读 r",M.r??"—"],["对齐天数",`${M.pairDays}`]])+
     `<svg width="100%" height="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
     <defs><linearGradient id="gBar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#00d4ff"/><stop offset="1" stop-color="#2f80ed"/></linearGradient></defs>
     ${grid}${bars}${labels}</svg>`;
@@ -1295,22 +1427,25 @@ function renderTop(){
       .sort((a,b)=>(b.words||0)-(a.words||0)).slice(0,8);
     $("midB3").style.flexDirection="column";
     const L=(stats&&stats.local)||{},arts=L.articles||[],lg=peakOf(arts,a=>a.words);
-    $("midB3").innerHTML=`<div class="top-stack"><div class="reach-note"><b>本地内容厚度排行</b> · 接入阅读数据后自动切换为阅读人数 TOP 榜；当前按正文字数排序。</div>`+
+    const M=derive();
+    $("midB3").innerHTML=`<div class="top-stack">`+
       `<div class="kvlist">`+items.map((a,i)=>`<div class="kvrow"><span class="rk">${String(i+1).padStart(2,"0")}</span><span class="nm" title="${esc(a.title)}">${esc(a.title)}</span><span class="v">${fmt(a.words)} 字</span></div>`).join("")+`</div>`+
-      `<div class="st-sec">本地内容厚度</div>`+miniCells([
-        ["文章数",`${arts.length} 篇`],["篇均字数",fmt(L.avgWords)],["最长一篇",fmt(lg.words||0)]])+`</div>`;
+      `<div class="st-sec">字数分布${qmark("按正文字数排序；P90 = 第 90 百分位，中位数不受极端长文影响；接入阅读数据后本榜自动切换为阅读人数 TOP")}</div>`+cells([
+        ["文章数",`${arts.length} 篇`],["篇均",fmt(L.avgWords)],["中位数",fmt(M.wMedian)],
+        ["P90",fmt(M.wP90)],["最长",fmt(M.wMax)],["极差",fmt((Number(M.wMax)||0)-(Number(M.wMedian)||0))]])+`</div>`;
     return;
   }
   const R=(stats&&stats.remoteSummary)||{},inter=(Number(R.share)||0)+(Number(R.fav)||0)+(Number(R.like)||0);
   const rate=R.read?((inter/Number(R.read))*100).toFixed(1)+"%":"—";
+  const M=derive();
   $("midB3").style.flexDirection="row";
   $("midB3").innerHTML=`<div class="top-stack"><div class="kvlist">${list.map((a,i)=>`<div class="kvrow">
     <span class="rk">${String(i+1).padStart(2,"0")}</span>
     <span class="nm" title="${esc(a.title)}">${esc(a.title||"（无标题）")}</span>
     <span class="v">${fmt(a.read)}</span></div>`).join("")}</div>`+
-    `<div class="st-sec">互动构成</div>`+miniCells([
+    `<div class="st-sec">互动构成${qmark("互动率 = (分享+收藏+在看) / 阅读；TOP1 占比 = 阅读最高一篇 / 总阅读，衡量流量集中度")}</div>`+cells([
       ["分享",fmt(R.share)],["收藏",fmt(R.fav)],["在看",fmt(R.like)],
-      ["互动合计",fmt(inter)],["互动率",rate],["篇均阅读",fmt(R.avgRead)]])+`</div>`;
+      ["互动合计",fmt(inter)],["互动率",rate],["TOP1占比",M.top1Share!=null?M.top1Share+"%":"—"]])+`</div>`;
 }
 
 // ---------- 文章矩阵：无缝跑马灯 ----------
