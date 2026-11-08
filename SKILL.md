@@ -38,6 +38,34 @@ and gitignored by design.
 
 The server binds `127.0.0.1` only — it is not exposed to the network.
 
+## Operator guide (when the user asks "how do I use this")
+
+**Two modes — the scheduled one is OPTIONAL.** Walk the user through `README.md`
+chapters 1 → 2 → 3 (manual) or 4 (scheduled); do not start with architecture.
+
+- **Manual (default)**: the bundle is a local console, **not a background service**.
+  Installing this skill creates no buttons and runs nothing automatically. Start the web
+  server (Quick start step 3), then on `/manage`: select an article → preview →
+  「一键发布到公众号」 (creates a **draft only**, never a mass-send; originality flag must
+  be ticked manually in the MP backend). The user writes the article, or asks the agent
+  to write one on demand — that is a one-off run, not a scheduled task.
+- **Scheduled**: a WorkBuddy recurring automation (e.g.
+  `FREQ=DAILY;BYHOUR=9;BYMINUTE=0`) with `cwds` = the app working directory and a prompt
+  that loads a daily authoring skill. A generic, credential-free template ships at
+  `references/daily-workflow.md`; copy it to
+  `<APP_HOME>/.workbuddy/skills/daily-article/SKILL.md` or
+  `~/.workbuddy/skills/daily-article/SKILL.md` **before** creating the automation.
+  It needs the machine awake and WorkBuddy running at that time. Optional stdio MCP
+  (`src/app.py --mode mcp`) is convenient but not required — the template has full CLI
+  fallbacks. `autoPublish=false` → only generate the article, operator publishes manually.
+  Pausing the automation returns to manual mode with no data loss; both share `data/`.
+
+**Facts to state up front**: Python 3.10+; the base console is stdlib-only, but publishing
+a draft needs `requests` and real `.xls` import needs `xlrd`; `data/secrets.json` must be
+created from `secrets.json.example`; the draft API checks the **server's egress IP**
+(shown in the login modal), not the browser IP. Never put real credentials into articles,
+logs, reports, or command output.
+
 ## Core capabilities
 
 1. **Article management & preview** (`/manage`): left list + right live preview +

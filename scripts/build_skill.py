@@ -26,6 +26,7 @@ build_skill.py — 重新生成「内容运营台」脱敏 SKILL 分发包。
 """
 import argparse
 import base64
+import glob
 import json
 import os
 import re
@@ -40,10 +41,26 @@ SKILL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP_DST = os.path.join(SKILL_ROOT, "assets", "app")
 DIST_DIR = os.path.join(SKILL_ROOT, "dist")
 
-DEFAULT_SRC = os.environ.get(
-    "ARTICLES_SRC",
-    "/Users/yangbo/WorkBuddy/2026-10-25-21-38-39/articles",
-)
+def _default_src() -> str:
+    """探测源工程，不硬编码任何本机绝对路径。
+
+    优先级：ARTICLES_SRC 环境变量 → 当前目录及其上级的 articles/
+    → ~/WorkBuddy/<工作区>/articles。找不到返回空串，由 main 提示显式指定 --src。
+    """
+    env = os.environ.get("ARTICLES_SRC")
+    if env:
+        return os.path.abspath(env)
+    cwd = os.getcwd()
+    candidates = [
+        os.path.join(cwd, "articles"),
+        os.path.join(os.path.dirname(cwd), "articles"),
+    ]
+    candidates += sorted(glob.glob(os.path.join(
+        os.path.expanduser("~"), "WorkBuddy", "*", "articles")))
+    for c in candidates:
+        if os.path.isdir(os.path.join(c, "src")) and os.path.isdir(os.path.join(c, "data")):
+            return os.path.abspath(c)
+    return ""
 
 # 原品牌名（base64 运行时解码，避免明文出现在分发包中）
 _ORIGINAL_AI = base64.b64decode("5piT5pm656CBQUk=").decode("utf-8")
@@ -224,14 +241,18 @@ def _zip_skill(out_path: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="重建并打包脱敏 SKILL 分发包")
-    ap.add_argument("--src", default=DEFAULT_SRC, help="真实工程根目录（含 src/ 与 data/）")
+    ap.add_argument("--src", default=_default_src(),
+                    help="真实工程根目录（含 src/ 与 data/）；也可用 ARTICLES_SRC 环境变量")
     ap.add_argument("--out", default=None, help="输出 zip 路径（默认 dist/wechat-article-studio.zip）")
     ap.add_argument("--no-zip", action="store_true", help="只重建 assets/app，不打 zip")
     args = ap.parse_args()
 
+    if not args.src:
+        sys.exit("[ERROR] 未找到源工程，请显式指定：--src /path/to/articles "
+                 "（或设置 ARTICLES_SRC 环境变量）")
     src_root = os.path.abspath(args.src)
-    if not os.path.isdir(src_root):
-        sys.exit(f"[ERROR] 源工程不存在：{src_root}")
+    if not os.path.isdir(src_root) or not os.path.isdir(os.path.join(src_root, "src")):
+        sys.exit(f"[ERROR] 源工程不存在或缺少 src/：{src_root}")
 
     print(f"[1/4] 重建 assets/app/（源：{src_root}）")
     os.makedirs(APP_DST, exist_ok=True)
