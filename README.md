@@ -212,6 +212,39 @@ A：账号身份由 `secrets.json` + `config.json` 驱动，单实例单账号�
 
 ---
 
+## 十三、从 GitHub 获取与重新打包
+
+### 方式一：作为 WorkBuddy Skill 安装（推荐）
+把本仓库克隆 / 下载到 WorkBuddy 的 skills 目录即可被识别为 Skill：
+```bash
+# 用户级（所有项目可用）
+git clone git@github.com:scpuny/daily-article-skill.git ~/.workbuddy/skills/wechat-article-studio
+# 或：下载 Release / zip 解压到上述目录
+```
+重启 WorkBuddy 后，在对话中即可调用「内容运营台」Skill。
+
+### 方式二：仅取运行所需的 app 目录
+不需要 Skill 机制时，只需 `assets/app/`：
+```bash
+cp -R wechat-article-studio/assets/app ~/wechat-studio
+cd ~/wechat-studio
+# 然后按「五、安装与运行」启动服务
+```
+
+### 重新打包（维护者）
+仓库自带一键打包脚本，从真实工程重建脱敏 `assets/app/` 并产出可分发的 zip：
+```bash
+cd wechat-article-studio
+python3 scripts/build_skill.py                              # 重建 + 打包到 dist/
+python3 scripts/build_skill.py --src /path/to/your/articles # 指定源工程
+python3 scripts/build_skill.py --no-zip                     # 仅重建 assets/app
+```
+脚本会：① 复制源工程 `src/` 与 `data/` 白名单；② 把原品牌名替换为中性「内容运营台」；③ 剔除真实凭据 / 登录态 / 业务数据；④ 打包后做**隐私兜底扫描**，一旦检测到真实 `appId` / `__biz` / `token` / 原品牌名残留立即报错、绝不产出泄露包。
+
+> 注意：分发前请确认你本地填入的 `data/secrets.json`（真实 `appId`/`appSecret`）**未被读入**——脚本只读取白名单文件，真实凭据文件始终被排除。
+
+---
+
 ## 许可
 
 本工具按「自用 / 内部分发」提供，凭据与账号数据由使用者自行负责。
