@@ -243,6 +243,35 @@ python3 scripts/build_skill.py --no-zip                     # 仅重建 assets/a
 
 > 注意：分发前请确认你本地填入的 `data/secrets.json`（真实 `appId`/`appSecret`）**未被读入**——脚本只读取白名单文件，真实凭据文件始终被排除。
 
+### 提交后自动同步（可选）
+如果你是开发者，在本地 `articles/` 工程里维护代码，可让它每次 `git commit` 后自动重建脱敏分发包，省去手动跑脚本：
+
+1. 在 `articles/` 初始化**本地** git 仓库，并用**白名单式** `.gitignore`（默认忽略一切，仅放行 `src/`、`scripts/`、`docs/`），把 `data/`、`state/`、真实 `secrets.json`、业务索引全部挡在门外；
+2. 把钩子逻辑放进 `articles/scripts/post-commit.sh`（随仓库跟踪、可复现），核心就一行：
+```bash
+ARTICLES_DIR="$(git rev-parse --show-toplevel)"
+SKILL_DIR="${SKILL_DIR:-$HOME/.workbuddy/skills/wechat-article-studio}"
+python3 "$SKILL_DIR/scripts/build_skill.py" --src "$ARTICLES_DIR"
+```
+3. 再把 `articles/.git/hooks/post-commit` 做成转发器并 `chmod +x`：
+```bash
+#!/bin/bash
+ROOT="$(git rev-parse --show-toplevel)" || exit 0
+[ -x "$ROOT/scripts/post-commit.sh" ] && exec "$ROOT/scripts/post-commit.sh"
+exit 0
+```
+> 钩子只在本地运行，只把脱敏后的副本写进 Skill 目录，**不会**把 `articles/` 的真实凭据 / 登录态 / 业务数据带进任何仓库；且 `post-commit` 的退出码不影响已完成的提交。分发仓库仍需你手动 `git add -A && git commit && git push`。
+
+### 标准手动同步流程（不装钩子也行）
+改完 `articles/` 代码后，用下面命令重建分发包并推送到 GitHub：
+```bash
+python3 ~/.workbuddy/skills/wechat-article-studio/scripts/build_skill.py \
+  --src /Users/yangbo/WorkBuddy/2026-10-25-21-38-39/articles
+
+cd ~/.workbuddy/skills/wechat-article-studio
+git add -A && git commit -m "chore: 同步 articles 代码" && git push
+```
+
 ---
 
 ## 许可
