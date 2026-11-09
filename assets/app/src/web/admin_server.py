@@ -53,7 +53,7 @@ import paths
 paths.bootstrap()      # 把 src/core 加入 sys.path（新旧布局都能 import core 模块）
 
 import publish_wechat   # 复用发布逻辑（含主题渲染）
-import stats_provider   # 本地指标 + 公众号统计（可插拔）
+import stats_provider   # 本地指标 + 网页端导出快照
 import theme_manager    # 多主题数据层
 
 UI_PATH = paths.web_file("admin_ui.html")
@@ -143,15 +143,6 @@ def _safe_join(base, rel):
 def _resolve_article_path(rel):
     """index.json 相对路径 → 磁盘绝对路径（paths 兼容新旧布局 + 防穿越）。"""
     return paths.resolve(rel)
-
-
-def _wx_token():
-    """复用 publish_wechat 的 token 缓存（state/.wx_token.json）。"""
-    cfg = paths.load_config()
-    appid, secret = cfg.get("appId", ""), cfg.get("appSecret", "")
-    if not appid or not secret:
-        raise RuntimeError("未配置 appId / appSecret")
-    return publish_wechat.get_access_token(appid, secret)
 
 
 def _articles_summary():
@@ -325,7 +316,6 @@ class Handler(BaseHTTPRequestHandler):
                 "articles": len(_read_json(paths.index(), [])),
                 "series": _read_json(paths.series(), {}),
                 "statsSource": st.get("source", "none"),
-                "apiStatus": st.get("apiStatus") or {},
                 "activeTheme": theme_manager.load().get("active"),
                 "configKeys": sorted(cfg.keys()),
                 "serverDir": paths.home(),
@@ -542,23 +532,6 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         # ---------- 运营数据 ----------
-        if parsed.path == "/api/stats/refresh":
-            body = self._read_body()
-            try:
-                token = _wx_token()
-            except Exception as e:
-                self._send(200, {"ok": False, "message": str(e),
-                                 "stats": stats_provider.snapshot()})
-                return
-            try:
-                res = stats_provider.refresh(
-                    token, days=7, force=bool(body.get("force")))
-            except Exception as e:
-                res = {"ok": False, "message": f"刷新失败: {e}"}
-            res["stats"] = stats_provider.snapshot()
-            self._send(200, res)
-            return
-
         if parsed.path == "/api/stats/import":
             body = self._read_body()
             fn = body.get("filename", "") or ""
@@ -812,7 +785,7 @@ class Handler(BaseHTTPRequestHandler):
                 import base64
                 import mp_session
                 # stats_provider 已在模块级导入：此处不可再局部 import，否则会把 do_POST
-                # 内的 stats_provider 变成局部变量，令 /api/stats/refresh 等分支 UnboundLocalError
+                # 内的 stats_provider 变成局部变量，令其它分支 UnboundLocalError
                 import strategy_engine
                 days = int(body.get("days", 30) or 30)
                 end_ts = body.get("endTs") or None

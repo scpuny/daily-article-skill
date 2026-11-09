@@ -134,16 +134,10 @@
   .kvrow .rk{flex:0 0 20px;color:var(--accent2);font-weight:800}
   .kvrow .nm{flex:1;color:#dcecff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .kvrow .v{color:var(--cyan);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .ep-t{font-size:11px;color:#5f7396;margin-top:2px}
-  .eplist{width:100%;display:flex;flex-direction:column;gap:4px;max-height:92px;overflow:auto;margin-top:2px}
   .reach-note{width:100%;font-size:11.5px;line-height:1.65;color:var(--muted);
     border:1px dashed rgba(64,158,255,.25);border-radius:9px;padding:8px 11px;margin-bottom:8px;
     background:rgba(8,21,46,.5)}
   .reach-note b{color:var(--cyan)}
-  .eprow{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:3px 7px;
-    border-bottom:1px dashed rgba(64,158,255,.14);color:var(--muted)}
-  .eprow span:first-child{color:#cfe4ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .eprow code{font-size:10.5px;color:var(--accent2)}
   /* 文章矩阵：向左无缝跑马灯 */
   .matrix{border:1px solid var(--border);border-radius:14px;padding:13px 16px;background:var(--panel);
     display:flex;flex-direction:column;min-height:0;overflow:hidden}
@@ -436,7 +430,6 @@
     </div>
     <div class="src" id="srcLine">数据源加载中…</div>
     <div class="tacts">
-      <button class="tbtn" onclick="refreshStats(true)" title="仅探测公众号接口权限；本号为个人订阅号，不会自动同步，也不会改动现有数据快照"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L4 8m0-5v5h5M4 13a8 8 0 0 0 14 5l2-2m0 5v-5h-5"/></svg> 检查接口</button>
       <button class="tbtn" onclick="openImport()">导入数据</button>
       <button class="tbtn ghost" onclick="clearRemote()">清除</button>
     </div>
@@ -723,7 +716,7 @@ function derive(){
   return {
     dailyN:daily.length,artN:arts.length,freshH:hoursSince(S.updatedAt),
     zeroRead:arts.filter(a=>!Number(a.read)).length,cover:pct(arts.length,L.total),
-    apiCode:(S.apiStatus||{}).code??"未探测",epN:(S.endpoints||[]).length,
+    avgDailyRead:daily.length?Math.round(Number(R.read||0)/daily.length):null,
     r:corr(pairs.map(d=>d.count),pairs.map(d=>reads[d.date])),pairDays:pairs.length,
     zeroPost:tl.filter(d=>!d.count).length,peakPost:Math.max(0,...tl.map(d=>d.count)),
     n,gapWarm:gapTo(n,8),gapStrong:gapTo(n,20),pairRate:pct(pr.paired,pr.total),
@@ -750,21 +743,17 @@ setInterval(tick,1000);tick();
 
 // ---------- 数据源状态条 ----------
 function renderSource(){
-  const s=stats||{}, a=s.apiStatus||{}, sum=s.remoteSummary;
+  const s=stats||{}, sum=s.remoteSummary;
   let badge,label;
-  if(s.source==="api"){badge='<span class="badge ok">接口已接入</span>';label=`公众号接口 · 更新 ${esc(s.updatedAt||"—")}`;}
-  else if(s.source==="csv"){const ft=(s.format||"csv").toUpperCase();
+  if(s.source==="csv"){
+    const ft=(s.format||"csv").toUpperCase();
     const last=(s.daily||[]).reduce((m,d)=>d.date>m?d.date:m,"");
     badge=`<span class="badge ok">${ft} 快照</span>`;
-    label=`后台导出数据 · 数据截至 ${esc(last||"—")} · ${sum?sum.articleCount:0} 条文章（不自动更新）`;}
-  else {badge='<span class="badge off">仅本地数据</span>';label="微信阅读/分享指标未接入";}
-  let perm;
-  if(a.authorized) perm='<span class="badge ok">接口权限正常</span>';
-  else if(a.code===48001) perm='<span class="badge warn">接口未授权 48001</span>';
-  else if(a.code) perm='<span class="badge warn">'+(a.code==="__net_error__"?"网络不可达":("errcode "+a.code))+'</span>';
-  else perm='<span class="badge off">权限未探测</span>';
-  $("srcLine").innerHTML=`${badge}${perm}<span>${label}</span>`+
-    (a.checkedAt?`<span style="color:#5f7396">· 探测于 ${esc(a.checkedAt)}</span>`:"");
+    label=`后台导出数据 · 数据截至 ${esc(last||"—")} · ${sum?sum.articleCount:0} 条文章（不自动更新）`;
+  } else {
+    badge='<span class="badge off">仅本地数据</span>';label="尚未导入传播数据";
+  }
+  $("srcLine").innerHTML=`${badge}<span>${label}</span>`;
 }
 
 // ---------- 加载 ----------
@@ -814,8 +803,6 @@ async function loadAll(){try{
   if(tabs[v]){view=v;Object.values(tabs).forEach(id=>$(id).classList.remove("on"));$(tabs[v]).classList.add("on");}
   renderAll();
   $("matrixMeta").textContent=`共 ${articles.length} 篇 · 已建草稿 ${articles.filter(a=>a.published).length} · 待建草稿 ${articles.filter(a=>!a.published).length}`;
-  // 首屏不阻塞：后台补一次权限探测（命中缓存则不发网络请求）
-  refreshStats(false);
 }catch(e){toast("加载失败: "+e.message,"err");}}
 
 function renderAll(){renderSource();renderKPIs();renderMid();renderRail();}
@@ -940,7 +927,7 @@ function renderMid(){
     const dd=(stats&&stats.daily)||[],R=(stats&&stats.remoteSummary)||null;
     $("midT1").innerHTML="数据接入指标"+badge(`${dd.length} 天日粒度`);
     $("midT2").innerHTML="近 7 日阅读趋势"+badge(dd.length?`合计 ${fmt(sumBy(dd,d=>d.read))} 阅读`:"暂无快照");
-    $("midT3").innerHTML="文章表现 TOP"+badge(R?`${fmt(R.articleCount||0)} 条明细`:"接口未授权");
+    $("midT3").innerHTML="文章表现 TOP"+badge(R?`${fmt(R.articleCount||0)} 条明细`:"暂无明细");
     $("midB1").style.alignItems="stretch";$("midB2").style.alignItems="stretch";$("midB3").style.alignItems="stretch";
     renderGuide();renderReachTrend();renderTop();
   }
@@ -1410,30 +1397,34 @@ function renderPillars(){
   requestAnimationFrame(()=>document.querySelectorAll("#pillars .fill").forEach(f=>f.style.width=f.dataset.w+"%"));
 }
 
-// 传播视图：无数据时不画假图，显示明确状态与接入路径
+// 传播视图：网页端导出快照为唯一数据源，只展示快照与互动指标
 function renderGuide(){
-  const s=stats||{},a=s.apiStatus||{},eps=s.endpoints||[],M=derive();
+  const s=stats||{},R=s.remoteSummary||{},M=derive();
   const good=s.source!=="none";
   const last=(s.daily||[]).reduce((m,d)=>d.date>m?d.date:m,"");
-  const msg=String(a.message||"尚未探测接口权限");
-  let html=`<div class="stack"><div class="status-card ${a.authorized?'good':''}">
-    <div class="t">${good?(s.source==="api"?"已接入统计接口":"传播数据快照"):"统计接口不可用"}</div>
-    <div class="m" title="${esc(msg)}">${esc(msg.length>42?msg.slice(0,42)+"…":msg)}</div>
-    <div class="sub">数据源：<b style="color:#46e6ff">${s.source==="api"?"datacube API":(s.source==="csv"?"后台导出 XLS":"仅本地")}</b>${last?" · 截至 "+esc(last):""}</div></div>`;
+  const summary=good?`${M.dailyN} 天日粒度 · ${M.artN} 条明细 · 截至 ${last||"—"}`:"尚未导入传播快照，本地指标仍实时计算";
+  let html=`<div class="stack"><div class="status-card ${good?'good':''}">
+    <div class="t">${good?"传播数据快照":"暂无传播快照"}</div>
+    <div class="m">${esc(summary)}</div>
+    <div class="sub">来源：<b style="color:#46e6ff">公众号后台网页端导出</b>${s.updatedAt?" · 更新 "+esc(String(s.updatedAt).slice(0,16)):""}</div></div>`;
   html+=stepBar([
-    {label:"导出单篇",state:good?"done":"now",tip:"公众号后台 → 内容分析 / 图文分析 → 导出「单篇」（表头含标题）；也可放进 ~/Downloads"},
+    {label:"网页端导出",state:good?"done":"now",tip:"公众号后台 → 内容分析 / 图文分析 → 导出单篇或总表 .xls；也可在管理台用扫码登录态一键拉取"},
     {label:"导入快照",state:good?"done":"",tip:"点右上「导入数据」选择导出的 .xls，一次性快照立即显示真实图表"},
     {label:"看指标",state:good?"now":"",tip:"传播表现视图展示阅读 / 互动 / 篇均 / 发文×阅读相关系数；本地指标始终实时计算"}
   ]);
-  html+=`<div class="st-sec">快照健康度${qmark("日粒度天数、文章明细条数、快照距今小时数、零阅读篇数、明细覆盖率、接口错误码；覆盖率 = 明细条数 / 本地文章数")}</div>`+cells([
+  html+=`<div class="st-sec">快照健康度${qmark("日粒度天数、明细条数、快照距今小时数、零阅读篇数、明细覆盖率、日均阅读；覆盖率 = 明细条数 / 本地文章数")}</div>`+cells([
     ["日粒度",`${M.dailyN} 天`],["明细",`${M.artN} 条`],["距今",`${M.freshH??"—"} h`],
-    ["零阅读",`${M.zeroRead} 篇`],["覆盖率",M.cover!=null?M.cover+"%":"—"],["接口码",M.apiCode]
+    ["零阅读",`${M.zeroRead} 篇`],["覆盖率",M.cover!=null?M.cover+"%":"—"],["日均阅读",M.avgDailyRead??"—"]
   ]);
-  html+=`<div class="st-sec">接口探测${qmark("已适配接口数、权限码、是否授权、最近探测时间；个人订阅号恒返回 48001，与代码和 IP 白名单无关")}</div>`+cells([
-    ["已适配",`${M.epN} 个`],["授权",a.authorized?"是":"否"],["错误码",M.apiCode],
-    ["探测于",String(a.checkedAt||"—").slice(11,19)],["数据截至",last||"—"],["快照",String(s.updatedAt||"—").slice(0,10)]
+  html+=`<div class="st-sec">互动质量${qmark("总阅读 / 分享 / 收藏 / 在看、篇均阅读、TOP1 阅读占比；全部由已导入快照现算")}</div>`+cells([
+    ["总阅读",fmt(R.read||0)],["分享",fmt(R.share||0)],["收藏",fmt(R.fav||0)],
+    ["在看",fmt(R.like||0)],["篇均阅读",fmt(R.avgRead||0)],["TOP1 占比",M.top1Share!=null?M.top1Share+"%":"—"]
   ]);
-  html+=`<details class="st-more"><summary>已适配接口清单<span class="cnt">${M.epN}</span></summary><div class="inner"><div class="eplist">${eps.map(e=>`<div class="eprow"><span>${esc(e.name)}</span><code>${esc(e.path.split('/').pop())}</code></div>`).join("")}</div></div></details></div>`;
+  html+=`<div class="st-sec">快照时点</div>`+cells([
+    ["数据截至",last||"—"],["更新于",String(s.updatedAt||"—").slice(11,19)],
+    ["格式",String(s.format||"—").toUpperCase()],["对齐天数",`${M.pairDays} 天`],
+    ["相关系数 r",M.r??"样本不足"],["零发文日",`${M.zeroPost} 天`]
+  ])+`</div>`;
   $("midB1").innerHTML=html;
 }
 
@@ -1540,16 +1531,6 @@ $("rail").addEventListener("click",e=>{
 });
 
 // ---------- 数据操作 ----------
-async function refreshStats(force){
-  try{
-    const d=await api("POST","/api/stats/refresh",{force:!!force});
-    if(d.stats){stats=d.stats;renderAll();}
-    if(force){
-      if(d.ok)toast(`已刷新：${d.daily||0} 天 / ${d.articles||0} 篇`,"ok");
-      else toast(d.message||"接口未授权，已保留当前数据源","err");
-    }
-  }catch(e){if(force)toast("刷新失败: "+e.message,"err");}
-}
 function openImport(){$("csvFile").value="";$("impMask").classList.add("show");}
 function closeImport(){$("impMask").classList.remove("show");}
 function readB64(file){return new Promise((res,rej)=>{const r=new FileReader();

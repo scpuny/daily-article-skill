@@ -324,7 +324,7 @@
           </div>
           <div style="margin-top:14px;font-size:11px;color:var(--warn);line-height:1.8">
             <span data-ic="alert"></span> 原创声明：draft/add 接口不支持指定原创，需在公众号后台群发时手动勾选。<br>
-            <span data-ic="alert"></span> 本号为个人订阅号，无法申请微信认证，数据统计接口恒返回 48001（与代码、IP 白名单无关）。传播数据请用后台「内容分析」导出的 .xls 手动导入，结果是一次性快照、不会自动更新；不导入也不影响大屏的本地指标。
+            <span data-ic="alert"></span> 传播数据来自公众号后台网页端导出的 .xls（可扫码登录态一键拉取）；官方统计 API 已不使用，无需微信认证。
           </div>
         </div>
       </section>
@@ -380,7 +380,7 @@
         <div class="sec-h"><h2>系统与数据</h2><p>只读运行状态 + 数据入口</p></div>
         <div class="card">
           <h3>运行状态</h3>
-          <p class="desc">数据来自本地文件与接口探测，不做任何臆造。</p>
+          <p class="desc">运行状态来自本地台账与已导入的传播快照，不做任何臆造。</p>
           <div class="kv" id="sysKv"><div class="k">载入中…</div><div class="v">—</div></div>
         </div>
         <div class="card">
@@ -395,10 +395,9 @@
         </div>
         <div class="card">
           <h3>数据快捷操作</h3>
-          <p class="desc">传播表现数据优先用公众号后台导出的 .xls / .xlsx，零成本绕开接口权限。</p>
+          <p class="desc">传播表现数据来自公众号后台导出的 .xls / .xlsx 快照，可在文章管理页用扫码登录态一键拉取。</p>
           <div class="tbar">
       <a class="btn" href="/?view=reach">前往传播表现 <span data-ic="right"></span></a>
-      <button class="btn gh" onclick="quickRefresh()" data-ic="refresh">刷新接口数据</button>
             <button class="btn gh" onclick="quickClear()">清除导入数据</button>
           </div>
         </div>
@@ -592,13 +591,12 @@ async function fillSystem(){
   try{
     const [s,st]=await Promise.all([api("GET","/api/system"),api("GET","/api/stats")]);
     sys=s;
-    const a=s.apiStatus||{};
     $("sysKv").innerHTML=[
       ["文章总数",s.articles+" 篇"],
       ["当前主题",(activeTheme()||{}).name||s.activeTheme||"—"],
-      ["传播数据源",s.statsSource==="api"?"微信统计接口":s.statsSource==="csv"?"后台导出文件":"仅本地指标"],
-      ["接口权限",a.authorized?"已授权":("未授权 "+(a.code||"—"))],
-      ["最近一次探测",a.checkedAt||"未探测"],
+      ["传播数据源",s.statsSource==="csv"?"后台导出文件":"仅本地指标"],
+      ["传播明细",`${(st.articles||[]).length} 条`],
+      ["快照更新于",st.updatedAt||"—"],
       ["服务目录",s.serverDir||"—"],
       ["定时任务","每日 09:00 · ACTIVE（生成 + 自动建草稿）"],
     ].map(([k,v])=>`<div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>`).join("");
@@ -611,11 +609,6 @@ async function fillSystem(){
     $("seriesKv").innerHTML=rows;
     $("keyChips").innerHTML=(s.configKeys||[]).map(k=>`<span class="chip ok">${esc(k)}</span>`).join("");
   }catch(e){$("sysKv").innerHTML=`<div class="k">读取失败</div><div class="v">${esc(e.message)}</div>`;}
-}
-async function quickRefresh(){
-  try{const d=await api("POST","/api/stats/refresh",{force:true});
-    toast(d.ok?"接口数据已刷新":"接口未授权，可导入后台 xls");fillSystem();}
-  catch(e){toast("刷新失败: "+e.message,true);}
 }
 async function quickClear(){
   if(!confirm("清除已导入的后台数据？本地指标不受影响。"))return;

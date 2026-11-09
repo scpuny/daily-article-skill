@@ -112,8 +112,9 @@ never hardcoded — swap accounts by editing `data/secrets.json` + `data/config.
 
 - `data/config.json` — topics, audience, wordRange, author, themeName, publishTarget,
   autoPublish. `author` is the byline shown on published drafts.
-- `data/secrets.json` — **not bundled**; `appId` + `appSecret` only. Required for the
-  MP datacube API; login itself does not need `appSecret`.
+- `data/secrets.json` — **not bundled**; `appId` + `appSecret` only. Required for
+  server-side draft APIs; QR login does not need `appSecret`. The legacy MP
+  statistics API is no longer used; reach data comes from web-console exports.
 - `data/themes.json` — theme definitions (safe to ship).
 
 ## Privacy & distribution notes

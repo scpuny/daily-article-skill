@@ -3,22 +3,22 @@
 """
 内容运营台 大屏 · 统一数据层
 
-数据来源（优先级从高到低，前端一律按 source 显示，绝不伪造 0）：
-  api  微信 datacube 图文统计接口  —— 需「已通过微信认证」+ 文章已群发/发表
-  csv  公众号后台「内容分析」导出的文件（.xls / .xlsx / .csv）—— 零成本，绕开接口权限
+数据来源（前端一律按 source 显示，绝不伪造 0）：
+  csv  公众号后台网页端「内容分析」导出的文件（.xls / .xlsx / .csv），
+       由扫码登录态网页接口自动拉取或手动导入 —— 不依赖官方统计 API 权限
   none 仅本地数据 —— 远端指标显示「—」并给出接入指引
 
-持久化：articles/stats_cache.json（只保存远端指标与权限探测结果）
+持久化：state/stats_cache.json（只保存导入的传播指标快照）
 本地指标：每次从 index.json / *.md / *.html 实时计算，无需缓存。
+
+注：微信官方 datacube 图文统计接口（需微信认证，个人订阅号不可用）
+    已整体下线，本模块不再做任何权限探测或官方 API 网络拉取。
 """
 import csv
 import io
 import json
 import os
 import re
-import time
-import urllib.request
-import urllib.error
 from collections import Counter
 from datetime import date, datetime, timedelta
 
@@ -39,32 +39,6 @@ for _p in (_d, _os.path.dirname(_os.path.abspath(__file__))):
 import paths
 
 # 数据文件路径一律动态取，支持运行时切换 YIZHIMA_HOME / YIZHIMA_DATA_DIR
-
-DATACUBE = "https://api.weixin.qq.com/datacube/"
-
-# 微信公众平台「图文数据」接口清单（截图中的 10 个）
-ENDPOINTS = [
-    {"name": "获取图文群发每日数据", "path": "/datacube/getarticlesummary",
-     "desc": "某天所有被阅读过的群发文章当天的阅读数据", "maxSpan": 1},
-    {"name": "获取图文阅读分时数据", "path": "/datacube/getuserreadhour",
-     "desc": "图文阅读分时数据", "maxSpan": 1},
-    {"name": "获取图文转发分时数据", "path": "/datacube/getusersharehour",
-     "desc": "图文转发分时数据", "maxSpan": 1},
-    {"name": "获取图文阅读概况数据", "path": "/datacube/getuserread",
-     "desc": "图文阅读概括数据", "maxSpan": 7},
-    {"name": "获取图文群发总数据", "path": "/datacube/getarticletotal",
-     "desc": "群发文章从群发日起的总量统计数据", "maxSpan": 1},
-    {"name": "获取图文转发概况数据", "path": "/datacube/getusershare",
-     "desc": "图文转发概况数据", "maxSpan": 7},
-    {"name": "获取发表内容每日阅读数据", "path": "/datacube/getarticleread",
-     "desc": "某天所有被阅读过的发表内容的阅读指标", "maxSpan": 1},
-    {"name": "获取发表内容每日分享数据", "path": "/datacube/getarticleshare",
-     "desc": "某天所有被分享过的发表内容的分享指标", "maxSpan": 1},
-    {"name": "获取发表内容概况总数据", "path": "/datacube/getbizsummary",
-     "desc": "圈选日期内账号发表内容汇总的概览数据", "maxSpan": 7},
-    {"name": "获取发表内容发表详细数据", "path": "/datacube/getarticletotaldetail",
-     "desc": "圈选日期内所有发表内容的详细数据", "maxSpan": 7},
-]
 
 # ---------------------------------------------------------------- 基础工具
 
@@ -92,7 +66,7 @@ def _cache():
     c.setdefault("updatedAt", "")
     c.setdefault("daily", [])
     c.setdefault("articles", [])
-    c.setdefault("apiStatus", {})
+    c.pop("apiStatus", None)   # 兼容旧快照：清理已下线的官方 API 权限探测字段
     return c
 
 
@@ -116,126 +90,8 @@ def _pick(d, *keys):
     return 0
 
 
-def _post(ep, token, payload, timeout=20):
-    url = f"{DATACUBE}{ep}?access_token={token}"
-    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=body, method="POST",
-        headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read().decode("utf-8"))
-    except Exception as e:
-        return {"__net_error__": str(e)}
-
-
-def _date_span(days=7):
-    end = date.today() - timedelta(days=1)   # 微信数据 T+1，当天无数据
-    start = end - timedelta(days=days - 1)
-    return start.isoformat(), end.isoformat()
-
-
-# ---------------------------------------------------------------- 权限探测
-
-def probe_permission(token, force=False, ttl=3600):
-    """用最小代价探测 datacube 权限，结果缓存 ttl 秒。"""
-    c = _cache()
-    st = c.get("apiStatus") or {}
-    if (not force and st.get("ts")
-            and time.time() - st["ts"] < ttl
-            and st.get("code") not in (None, "__net_error__")):
-        return st
-
-    begin, end = _date_span(1)
-    r = _post("getarticlesummary", token,
-              {"begin_date": begin, "end_date": end})
-    if "__net_error__" in r:
-        st = {"authorized": False, "code": "__net_error__",
-              "message": "网络不可达：" + r["__net_error__"][:80], "ts": time.time()}
-    else:
-        code = r.get("errcode", 0)
-        if code == 0 or "list" in r:
-            st = {"authorized": True, "code": 0, "message": "接口权限正常",
-                  "ts": time.time()}
-        elif code == 48001:
-            st = {"authorized": False, "code": 48001,
-                  "message": "接口未授权（48001）：数据统计接口仅对已通过微信认证的订阅号/服务号开放",
-                  "ts": time.time()}
-        else:
-            st = {"authorized": False, "code": code,
-                  "message": f"{r.get('errmsg', '未知错误')}（errcode={code}）",
-                  "ts": time.time()}
-    st["checkedAt"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c["apiStatus"] = st
-    _write_json(paths.stats_cache(), c)
-    return st
-
-
-# ---------------------------------------------------------------- API 拉取
-
-def fetch_datacube(token, days=7):
-    """有权限时拉取并归一化。返回 {daily, articles} 或抛 RuntimeError。"""
-    begin, end = _date_span(days)
-
-    read = _post("getuserread", token,
-                 {"begin_date": begin, "end_date": end})
-    share = _post("getusershare", token,
-                  {"begin_date": begin, "end_date": end})
-    for name, r in (("getuserread", read), ("getusershare", share)):
-        if r.get("errcode", 0) not in (0,):
-            raise RuntimeError(f"{name} 失败: {r.get('errmsg')} (errcode={r.get('errcode')})")
-
-    by_date = {}
-    for row in read.get("list", []) or []:
-        d = str(_pick(row, "ref_date", "stat_date", "date"))
-        if not d:
-            continue
-        by_date.setdefault(d, {"date": d, "read": 0, "share": 0, "fav": 0, "like": 0})
-        by_date[d]["read"] = _num(_pick(row, "int_page_read_user", "read_user", "read"))
-    for row in share.get("list", []) or []:
-        d = str(_pick(row, "ref_date", "stat_date", "date"))
-        if not d:
-            continue
-        by_date.setdefault(d, {"date": d, "read": 0, "share": 0, "fav": 0, "like": 0})
-        by_date[d]["share"] = _num(_pick(row, "share_user", "share"))
-        by_date[d]["fav"] = _num(_pick(row, "add_to_fav_user", "fav_user"))
-
-    # 文章级明细（TOP 榜）
-    detail = _post("getarticletotaldetail", token,
-                   {"begin_date": begin, "end_date": end,
-                    "offset": 0, "count": 100})
-    articles = []
-    for row in (detail.get("list", []) or []):
-        articles.append({
-            "date": str(_pick(row, "stat_date", "ref_date", "date")),
-            "title": str(_pick(row, "title", "article_title") or ""),
-            "read": _num(_pick(row, "int_page_read_user", "read_user", "read")),
-            "share": _num(_pick(row, "share_user", "share")),
-            "fav": _num(_pick(row, "add_to_fav_user", "fav_user")),
-            "like": _num(_pick(row, "like_user", "old_like_user", "like")),
-        })
-    return {"daily": sorted(by_date.values(), key=lambda x: x["date"]),
-            "articles": articles}
-
-
-def refresh(token, days=7, force=False):
-    """刷新远端数据。页面打开时 force=False 走权限缓存；手动点刷新 force=True 重新探测。
-    无权限时不覆盖已有 CSV 数据。"""
-    st = probe_permission(token, force=force)
-    if not st.get("authorized"):
-        return {"ok": False, "apiStatus": st,
-                "message": "接口未授权，已保留当前数据源。可改用公众号后台导出的 CSV。"}
-    try:
-        data = fetch_datacube(token, days)
-    except RuntimeError as e:
-        return {"ok": False, "apiStatus": st, "message": str(e)}
-    c = _cache()
-    c.update({"source": "api", "updatedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-              "daily": data["daily"], "articles": data["articles"],
-              "apiStatus": st})
-    _write_json(paths.stats_cache(), c)
-    return {"ok": True, "apiStatus": st, "source": "api",
-            "daily": len(data["daily"]), "articles": len(data["articles"])}
+# 官方 datacube API 权限探测与数据拉取已下线：
+# 传播数据统一由公众号后台网页端导出快照（扫码登录态拉取 / 手动导入）提供。
 
 
 # ---------------------------------------------------------------- CSV 导入
@@ -531,17 +387,12 @@ def local_metrics():
 
 def snapshot(token=None):
     c = _cache()
-    api = c.get("apiStatus") or {
-        "authorized": False, "code": None,
-        "message": "尚未探测接口权限，点击「刷新数据」可检测", "checkedAt": ""}
     return {
         "source": c.get("source", "none"),
         "format": c.get("format", ""),
         "updatedAt": c.get("updatedAt", ""),
-        "apiStatus": {k: v for k, v in api.items() if k != "ts"},
         "daily": c.get("daily", []),
         "articles": c.get("articles", []),
-        "endpoints": ENDPOINTS,
         "remoteSummary": _remote_summary(c.get("daily", []), c.get("articles", [])),
         "local": local_metrics(),
     }

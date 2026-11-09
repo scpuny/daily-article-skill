@@ -508,7 +508,7 @@ def _sync_stats_cache_interaction():
     管理台 KPI 的 remoteSummary 只从 stats_cache.json 汇总；第四批单篇补全
     原本只写 feedback.jsonl，导致「累计收藏 / 在看·点赞」永远显示 0。
     这里只回填这两个字段（articles 逐篇 + daily 按日汇总），
-    绝不动 read/share/date/title/source/updatedAt/apiStatus/format。
+    绝不动 read/share/date/title/source/updatedAt/format。
     全量对齐：一次调用即可补齐所有历史已补全文章。异常不阻断主流程。
     """
     try:
