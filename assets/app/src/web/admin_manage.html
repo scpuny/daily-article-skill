@@ -80,7 +80,9 @@
   .chip.pub{background:rgba(39,224,160,.15);color:var(--ok)}
   .chip.unpub{background:rgba(255,181,71,.15);color:var(--warn)}
   .sidefoot{flex:0 0 auto;padding:9px 12px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);text-align:center}
-  .ic{width:1em;height:1em;vertical-align:-.14em;flex:0 0 auto;display:inline-block}
+  /* 图标本身不吞鼠标事件，光标继承自按钮，保证 hover/点击都是手指状 */
+  .ic{width:1em;height:1em;vertical-align:-.14em;flex:0 0 auto;display:inline-block;
+    pointer-events:none;cursor:inherit}
   /* ---------- 第五批 v3：单篇明细手动拉取（满 7 天才出现；已定格可显式重拉） ---------- */
   .detailbar{flex:0 0 auto;padding:9px 12px;border-bottom:1px solid var(--border);
     display:flex;flex-direction:column;gap:7px;background:rgba(6,16,36,.38)}
@@ -91,9 +93,23 @@
     padding:7px 4px;font-size:11px;font-family:inherit;font-weight:600;white-space:nowrap;
     background:linear-gradient(90deg,rgba(47,128,237,.3),rgba(0,212,255,.18));color:#dff1ff}
   .dbtn:hover:not(:disabled){border-color:var(--accent2);background:rgba(0,212,255,.22)}
-  .dbtn:disabled{opacity:.42;cursor:default}
+  .dbtn:disabled{opacity:.42;cursor:not-allowed}
   .dbtn.g{flex:1 1 0;background:rgba(20,44,80,.5);border-color:var(--border);color:#bcd4f5;font-weight:500}
   .dbtn.g:hover:not(:disabled){background:rgba(255,255,255,.07)}
+  /* 光标：可点一律手型，禁用用禁止符；SVG 子元素继承，不会变成箭头 */
+  .dbtn,.dbtn *,.fetch,.fetch *{cursor:pointer}
+  .dbtn:disabled,.dbtn:disabled *,.fetch:disabled,.fetch:disabled *{cursor:not-allowed}
+  /* 批量进度条：文章量大时分片跑，实时反馈 + 随时停止 */
+  .dprog{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--cyan)}
+  .dprog[hidden]{display:none}
+  .dprog .pb{flex:1;min-width:24px;height:6px;border-radius:99px;
+    background:rgba(255,255,255,.09);overflow:hidden}
+  .dprog .pb i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,#2f80ed,#00d4ff);transition:width .25s}
+  .dprog span{flex:0 0 auto;white-space:nowrap}
+  .pstop{cursor:pointer;flex:0 0 auto;border:1px solid rgba(255,110,110,.5);border-radius:6px;
+    background:rgba(255,110,110,.12);color:#ff9b9b;font-family:inherit;font-size:10px;padding:3px 6px}
+  .pstop:hover{background:rgba(255,110,110,.25);color:#fff}
   .dhint{font-size:10.5px;color:var(--muted);line-height:1.55}
   .dhint b{color:var(--cyan);font-weight:600}
   .dhint b.warn{color:var(--warn)}
@@ -102,11 +118,18 @@
     font-size:10px;line-height:1;padding:5px 7px;border-radius:7px;white-space:nowrap;
     border:1px solid rgba(0,212,255,.5);background:rgba(0,212,255,.14);color:#9ceaff}
   .fetch:hover:not(:disabled){background:rgba(0,212,255,.28);border-color:var(--accent2);color:#fff}
-  .fetch.off{border-color:rgba(127,147,184,.35);background:rgba(127,147,184,.10);color:var(--muted);cursor:default}
+  .fetch.off{border-color:rgba(127,147,184,.35);background:rgba(127,147,184,.10);color:var(--muted);cursor:help}
   /* 已定格 = 琥珀色可点「重拉」，不再是灰色禁用态 */
   .fetch.redo{border-color:rgba(255,184,92,.45);background:rgba(255,184,92,.10);color:#ffb85c}
   .fetch.redo:hover:not(:disabled){background:rgba(255,184,92,.24);border-color:#ffb85c;color:#fff}
   .fetch.miss{border-color:rgba(255,184,92,.42);background:rgba(255,184,92,.10);color:#ffb85c;cursor:help}
+  /* 单篇按钮状态机：待拉取 / 拉取中（图标旋转）/ 成功 / 失败 */
+  .fetch.busy{border-color:rgba(0,212,255,.85);background:rgba(0,212,255,.24);color:#eafcff}
+  .fetch.ok{border-color:rgba(39,224,160,.6);background:rgba(39,224,160,.16);color:var(--ok)}
+  .fetch.err{border-color:rgba(255,110,110,.6);background:rgba(255,110,110,.14);color:#ff9b9b}
+  .dbtn.busy{border-color:var(--accent2);background:rgba(0,212,255,.22);color:#fff}
+  .fetch.busy .ic,.dbtn.busy .ic{animation:wbspin 1s linear infinite}
+  @keyframes wbspin{to{transform:rotate(360deg)}}
   #curlText{width:100%;height:148px;resize:vertical;border:1px solid var(--border);border-radius:9px;
     padding:10px;background:rgba(6,13,28,.8);color:#cfe3ff;font-size:11px;line-height:1.55;
     font-family:Consolas,Monaco,Menlo,monospace;outline:none}
@@ -321,6 +344,11 @@
           <button class="dbtn g" id="sessionBtn" data-ic="key" title="扫码登录公众号后台，或用 Copy as cURL 兜底">登录态</button>
         </div>
         <div class="dhint" id="detailHint">正在读取定格状态…</div>
+        <div class="dprog" id="batchProg" hidden>
+          <div class="pb"><i id="batchBar"></i></div>
+          <span id="batchTxt">准备中…</span>
+          <button class="pstop" id="batchStop" title="停止后续批次；已完成的不会重复拉取">停止</button>
+        </div>
       </div>
       <div class="list" id="list"></div>
       <div class="sidefoot" id="sidefoot">—</div>
@@ -493,6 +521,19 @@ function injectIcons(){
 let articles=[], filtered=[], current=null, statusFilter="all";
 /* 第五批：单篇明细定格状态（后端算好到期与否，前端只负责显示，不自行算日期） */
 let detailState={items:{},session:{valid:false},summary:{},freezeDays:7};
+/* 批量分片：文章再多也不会把一次 HTTP 请求拖到超时；每批固定篇数、串行、可停止。
+   未完成队列存在 sessionStorage，停止/登录态失效后再次点击可接着拉，不重复请求。 */
+const BATCH_SIZE=5, BATCH_PAUSE=1.5;
+let batchRunning=false, batchStop=false;
+const queueKey=scope=>"wb_fetch_queue_"+scope;
+function loadQueue(scope){
+  try{const v=JSON.parse(sessionStorage.getItem(queueKey(scope))||"[]");
+    return Array.isArray(v)?v.filter(x=>Number.isInteger(x)):[];}catch(e){return [];}
+}
+function saveQueue(scope,q){
+  try{q.length?sessionStorage.setItem(queueKey(scope),JSON.stringify(q))
+             :sessionStorage.removeItem(queueKey(scope));}catch(e){}
+}
 /* 右侧主题抽屉状态（与设置页共用同一份 themes.json） */
 let tDoc={active:"",themes:[]}, tSchema={groups:[],defaults:{}}, tSel="",
     tDirty=false, previewMode=false, tPvTimer=null;
@@ -584,12 +625,15 @@ function renderList(){
 function fetchChip(a){
   const d=(detailState.items||{})[String(a.id)]||{};
   if(!d.visible)return "";                       // 未满 7 天：完全不显示（后端也拒绝）
+  const se=detailState.session||{}, days=detailState.freezeDays||7;
+  const why=!d.msgid?"缺「内容url」":!d.due?`未满 ${days} 天`:!se.valid?"登录态未配置":"状态未就绪";
+  const off=d.canFetch?"":`（暂不可拉取：${why}，点击查看原因）`;
   if(d.frozen)return `<button class="fetch redo ${d.canFetch?'':'off'}" data-id="${a.id}" ${d.canFetch?'':'disabled'}
-    title="发表 ${esc(d.publishDate||"")} · 已 ${d.days} 天 · 于 ${esc(d.frozenAt||"")} 定格${d.refetchCount?`（已重拉 ${d.refetchCount} 次）`:""} · 点击重新拉取并覆盖明细/画像">${icon("refresh")} 重拉</button>`;
+    title="发表 ${esc(d.publishDate||"")} · 已 ${d.days} 天 · 于 ${esc(d.frozenAt||"")} 定格${d.refetchCount?`（已重拉 ${d.refetchCount} 次）`:""} · ${d.canFetch?"点击重新拉取并覆盖明细/画像":esc(off)}">${icon("refresh")} 重拉</button>`;
   if(!d.msgid)return `<button class="fetch miss" data-id="${a.id}"
     title="导出总表缺该篇「内容url」，无法拼下载链接；点击看处理办法">${icon("alert")} 缺链接</button>`;
   return `<button class="fetch ${d.canFetch?'':'off'}" data-id="${a.id}"
-    title="拉取单篇数据明细 · 发表 ${esc(d.publishDate||"")} · 已 ${d.days} 天">${icon("download")} 拉取</button>`;
+    title="拉取单篇数据明细 · 发表 ${esc(d.publishDate||"")} · 已 ${d.days} 天${esc(off)}">${icon("download")} 拉取</button>`;
 }
 
 async function loadDetailStatus(){
@@ -605,13 +649,17 @@ async function loadDetailStatus(){
 function renderDetailBar(){
   const s=detailState.summary||{}, se=detailState.session||{};
   const n=s.fetchable||0, rn=s.refetchable||0;
+  const days=detailState.freezeDays||7;
   const b=$("fetchAll");
   b.disabled=!n||!se.valid;
   b.innerHTML=icon("download")+(n?` 拉取（${n} 篇）`:" 拉取明细");
+  b.title=!se.valid?"登录态未配置：请先点「登录态」扫码登录"
+    :n?`分批拉取 ${n} 篇（每批 ${BATCH_SIZE} 篇），随时可停止`:`当前没有满 ${days} 天、未定格且链接齐全的文章`;
   const rb=$("refetchAll");
   rb.disabled=!rn||!se.valid;
   rb.innerHTML=icon("refresh")+(rn?` 重拉（${rn} 篇）`:" 重拉定格");
-  const days=detailState.freezeDays||7;
+  rb.title=!se.valid?"登录态未配置：请先点「登录态」扫码登录"
+    :rn?`分批重拉 ${rn} 篇（每批 ${BATCH_SIZE} 篇），随时可停止`:`当前没有满 ${days} 天且已定格、可重拉的文章`;
   const bits=[`满 ${days} 天 <b>${s.due||0}</b> 篇`,`已定格 <b>${s.frozen||0}</b> 篇`];
   if(rn)bits.push(`可重拉 <b>${rn}</b> 篇`);
   if(s.noMsgid)bits.push(`<b class="warn">缺链接 ${s.noMsgid}</b> 篇`);
@@ -633,39 +681,114 @@ async function doFetchOne(id,btn){
     return;
   }
   if(d.frozen && !confirm(`该篇已于 ${d.frozenAt||"此前"} 定格（已发表 ${d.days} 天）。重新拉取会用最新单篇明细覆盖现有互动与画像数据，并刷新定格时间。是否继续？`))return;
-  if(btn){btn.disabled=true;btn.textContent=d.frozen?"重拉中…":"拉取中…";}
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const old=btn?{cls:btn.className,html:btn.innerHTML}:null;
+  const setBtn=(cls,txt,ic)=>{if(!btn)return;btn.className=cls;btn.disabled=true;
+    btn.innerHTML=icon(ic)+" "+txt;};
+  const restore=()=>{if(!btn||!old)return;btn.className=old.cls;btn.innerHTML=old.html;btn.disabled=false;};
+  setBtn("fetch busy",d.frozen?"重拉中":"拉取中","refresh");   // 图标旋转 + 禁用
+  let ok=false;
   try{
     const r=await api("POST","/api/strategy/fetch-detail",{articleId:id});
     if(r.ok){
+      ok=true;
       const f=r.fields||{};
       toast(`${r.refetched?"已重新拉取并更新定格":"已拉取并定格"} · 收藏 ${f.fav||0} / 在看·点赞 ${f.like||0}`,"ok");
+      setBtn("fetch ok","完成","check");
+      await wait(1100);
     }else{
       toast("拉取失败："+(r.error||r.reason||"未知原因"),"err");
+      setBtn("fetch err","失败","alert");
+      await wait(1600);restore();
     }
-  }catch(e){toast("拉取失败："+e.message,"err");}
-  await loadDetailStatus();
+  }catch(e){
+    toast("拉取失败："+e.message,"err");
+    setBtn("fetch err","失败","alert");
+    await wait(1600);restore();
+  }
+  if(ok)await loadDetailStatus();   // 成功后重绘按钮为「↻ 重拉」，失败则原地可重试
 }
 
-/* 批量统一走 /api/strategy/fetch-details，用 scope 区分「补缺口」与「显式重拉」；
-   后端对两种 scope 都强制要求发表满 7 天，前端不自行算日期。 */
-async function runBatch(scope,btnId){
-  const s=detailState.summary||{}, days=detailState.freezeDays||7;
-  const n=scope==="frozen"?(s.refetchable||0):(s.fetchable||0);
-  if(!n){toast(scope==="frozen"?"没有可重拉的已定格文章":"没有待拉取的到期文章","err");return;}
-  const tip=scope==="frozen"
-    ? `将逐篇重新拉取 ${n} 篇「已满 ${days} 天且已定格」的单篇明细（每篇间隔 1.5 秒），用最新数据覆盖并刷新定格时间。是否继续？`
-    : `将逐篇拉取 ${n} 篇已发表满 ${days} 天、尚未定格的单篇明细（每篇间隔 1.5 秒），成功后自动定格。是否继续？`;
-  if(!confirm(tip))return;
-  const b=$(btnId);const label=scope==="frozen"?"重拉中":"拉取中";
-  b.disabled=true;b.textContent=`${label} 0/${n}`;
-  try{
-    const r=await api("POST","/api/strategy/fetch-details",{scope});
-    const ok=r.okCount||0,fail=r.failed||0;
-    toast(`完成：成功 ${ok} 篇${fail?`，失败 ${fail} 篇`:""}`,fail?"err":"ok");
-    if(fail)console.warn("[fetch-details]",scope,r.results);
-  }catch(e){toast("批量操作失败："+e.message,"err");}
-  await loadDetailStatus();
+/* 批量统一走 /api/strategy/fetch-details，scope 区分「补缺口」与「显式重拉」。
+   文章量大时先 dryRun 拿到固定队列，再按 BATCH_SIZE 分片串行请求：
+   单次 HTTP 只跑几篇不会超时，进度实时可见，可随时停止，中断后再点只拉剩下的。 */
+function batchProgress(done,total,ok,fail,note){
+  $("batchProg").hidden=false;
+  $("batchBar").style.width=(total?Math.min(100,Math.round(done/total*100)):100)+"%";
+  const left=Math.max(0,total-done);
+  $("batchTxt").textContent=`${done}/${total} · 成功 ${ok} · 失败 ${fail}`
+    +(left?` · 约 ${Math.ceil(left*BATCH_PAUSE)}s`:"")+(note||"");
 }
+async function runBatch(scope,btnId){
+  if(batchRunning)return;
+  const days=detailState.freezeDays||7;
+  const verb=scope==="frozen"?"重拉":"拉取";
+  let plan;
+  try{
+    plan=await api("POST","/api/strategy/fetch-details",{dryRun:true,scope});
+  }catch(e){toast("读取待拉清单失败："+e.message,"err");return;}
+  const fresh=(plan.targets||[]).map(t=>t.articleId);
+  if(!fresh.length){saveQueue(scope,[]);toast(scope==="frozen"?"没有可重拉的已定格文章":"没有待拉取的到期文章","err");return;}
+  let queue=loadQueue(scope);
+  if(queue.length){                       // 上次中断留下的未完成队列
+    const allow=new Set(fresh);
+    queue=queue.filter(id=>allow.has(id));
+  }
+  if(queue.length && !confirm(`上次还有 ${queue.length} 篇未拉完。\n点「确定」继续这 ${queue.length} 篇；点「取消」重新拉全部 ${fresh.length} 篇。`))queue=[];
+  if(!queue.length)queue=fresh.slice();
+  const total=queue.length;
+  const msg=`将分批${verb} ${total} 篇发表满 ${days} 天的单篇明细：\n`
+    +`每批 ${BATCH_SIZE} 篇、每篇间隔 ${BATCH_PAUSE} 秒，预计约 ${Math.ceil(total*BATCH_PAUSE)} 秒。\n`
+    +`可随时点「停止」；未完成的会自动保存，下次点击可继续，已完成的不会重复请求。\n是否继续？`;
+  if(!confirm(msg))return;
+  saveQueue(scope,queue);
+  batchRunning=true;batchStop=false;
+  const b=$(btnId), other=$(scope==="frozen"?"fetchAll":"refetchAll");
+  b.classList.add("busy");b.disabled=true;other.disabled=true;
+  let done=0,ok=0,fail=0,sessionDead=false;
+  batchProgress(0,total,0,0);
+  try{
+    while(queue.length&&!batchStop){
+      const slice=queue.splice(0,BATCH_SIZE);
+      saveQueue(scope,queue);                    // 每批出队即持久化，刷新页面也不丢
+      b.innerHTML=icon(scope==="frozen"?"refresh":"download")+` ${verb}中 ${done}/${total}`;
+      batchProgress(done,total,ok,fail);
+      let r;
+      try{
+        r=await api("POST","/api/strategy/fetch-details",
+          {scope,articleIds:slice,limit:BATCH_SIZE,pause:BATCH_PAUSE});
+      }catch(e){
+        queue=slice.concat(queue);               // 网络异常：整批放回队列，下次继续
+        saveQueue(scope,queue);
+        fail+=slice.length;done+=slice.length;
+        toast(`一批请求失败，任务已暂停：${e.message}`,"err");
+        batchProgress(done,total,ok,fail," · 已暂停");
+        break;
+      }
+      ok+=r.okCount||0;fail+=r.failed||0;done+=slice.length;
+      const rs=r.results||[];
+      if(rs.some(x=>/登录态/.test(String(x.error||""))))sessionDead=true;
+      if(fail)console.warn("[fetch-details]",scope,rs.filter(x=>!x.ok));
+      batchProgress(done,total,ok,fail);
+      if(sessionDead)break;
+    }
+  }finally{
+    const left=queue.length, stopped=batchStop||sessionDead;
+    if(!left && !stopped)saveQueue(scope,[]);  // 全部完成才清队列；中断保留待续拉
+    batchProgress(done,total,ok,fail,stopped?` · 已停止（剩 ${left} 篇）`:"");
+    toast(sessionDead?"登录态失效，已停止：请重新扫码登录"
+      :stopped?`已停止：成功 ${ok} 篇、失败 ${fail} 篇，剩 ${left} 篇未处理；再次点击可继续`
+      :`完成：成功 ${ok} 篇${fail?`，失败 ${fail} 篇`:""}`,
+      (sessionDead||stopped||fail)?"err":"ok");
+    try{await loadDetailStatus();}catch(e){}
+    b.classList.remove("busy");b.disabled=false;
+    await new Promise(r=>setTimeout(r,1200));   // 留一点时间看到最终进度
+    $("batchProg").hidden=true;
+    batchRunning=false;batchStop=false;
+  }
+}
+$("batchStop").onclick=()=>{if(!batchRunning)return;batchStop=true;
+  $("batchTxt").textContent+=" · 停止中…";};
 $("fetchAll").onclick=()=>runBatch("missing","fetchAll");
 $("refetchAll").onclick=()=>runBatch("frozen","refetchAll");
 

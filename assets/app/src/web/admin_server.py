@@ -773,12 +773,19 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 import strategy_engine
                 # scope: missing(默认，到期未定格) / frozen(到期已定格，显式重拉) / all
-                # 三种 scope 都在 strategy_engine 内强制要求发表满 7 天
+                # 三种 scope 都在 strategy_engine 内强制要求发表满 7 天。
+                # 文章量大时前端分片：先 dryRun 拿 articleIds 队列，再按 limit
+                # 分批调用；单次请求始终短，不会把 HTTP 拖到超时。
+                try:
+                    limit = max(0, int(body.get("limit", 0) or 0))
+                except (TypeError, ValueError):
+                    limit = 0
                 res = strategy_engine.fetch_detail_batch(
                     article_ids=body.get("articleIds"),
                     dry_run=bool(body.get("dryRun")),
                     pause=float(body.get("pause", 1.5)),
-                    scope=str(body.get("scope") or "missing"))
+                    scope=str(body.get("scope") or "missing"),
+                    limit=limit)
                 if res.get("okCount") and not body.get("dryRun"):
                     try:
                         res["strategySynced"] = strategy_engine.refresh_strategy_snapshot()

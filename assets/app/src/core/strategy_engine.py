@@ -1115,14 +1115,23 @@ def fetch_detail(article_id, dry_run=False):
 
 
 def fetch_detail_batch(article_ids=None, dry_run=False, pause=1.5,
-                       freeze_days=FREEZE_DAYS, scope="missing"):
+                       freeze_days=FREEZE_DAYS, scope="missing", limit=0):
     """批量拉取：scope=missing(默认，补缺口) / frozen(显式重拉) / all。
 
     三种 scope 都硬性要求 due（发表满 freeze_days 天）且有 msgid；未满 7 天
     绝不进入 targets。逐篇间隔 pause 秒、不并发，失败不刷新定格。
+
+    文章量增长后的保护（v3.1）：limit 限制单次最多处理多少篇（0=不限），
+    前端先 dryRun 拿固定 articleIds 队列、再按批分片调用，单次 HTTP 只跑几篇
+    不会超时；响应里的 remaining 是本次没处理的剩余篇数。中断续交由前端保存
+    未完成队列实现，不按时间跳过，避免误把刚拉过的文章排除掉。
     """
     if scope not in ("missing", "frozen", "all"):
         return {"ok": False, "error": "invalid scope", "results": []}
+    try:
+        lim = max(0, int(limit or 0))
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "invalid limit", "results": []}
     st = detail_status(freeze_days)
     keys = sorted(st["items"].keys(), key=lambda k: int(k))
     if article_ids is not None:
@@ -1136,9 +1145,12 @@ def fetch_detail_batch(article_ids=None, dry_run=False, pause=1.5,
             return True
         return bool(v["frozen"]) if scope == "frozen" else not v["frozen"]
 
-    targets = [(k, st["items"][k]) for k in keys if _in_scope(st["items"][k])]
+    all_targets = [(k, st["items"][k]) for k in keys if _in_scope(st["items"][k])]
+    targets = all_targets[:lim] if lim else all_targets
+    remaining = len(all_targets) - len(targets)
     if dry_run:
         return {"ok": True, "dryRun": True, "total": len(targets), "scope": scope,
+                "remaining": remaining, "limit": lim,
                 "targets": [{"articleId": int(k), "title": v["title"],
                              "publishDate": v["publishDate"], "days": v["days"],
                              "frozen": v["frozen"],
@@ -1156,6 +1168,7 @@ def fetch_detail_batch(article_ids=None, dry_run=False, pause=1.5,
     ok = sum(1 for r in results if r.get("ok"))
     return {"ok": ok == len(results), "total": len(targets), "okCount": ok,
             "failed": len(results) - ok, "results": results, "scope": scope,
+            "remaining": remaining, "limit": lim,
             "session": st["session"], "freezeDays": freeze_days}
 
 

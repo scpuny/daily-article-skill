@@ -54,6 +54,8 @@ chapters 1 → 2 → 3 (manual) or 4 (scheduled); do not start with architecture
   numbers never enter the feedback ledger. Already-frozen articles stay re-fetchable:
   card「↻ 重拉」or sidebar「重拉定格」overwrites the detail/profile fields with a fresh
   snapshot and refreshes the freeze timestamp; both require an explicit confirmation.
+  Batch buttons split into chunks of 5 with a live progress bar, a stop control and a
+  resumable queue, so a large archive never turns into one long HTTP request.
   See README chapter A-2 and §七.
 - **Scheduled**: a WorkBuddy recurring automation (e.g.
   `FREQ=DAILY;BYHOUR=9;BYMINUTE=0`) with `cwds` = the app working directory and a prompt
