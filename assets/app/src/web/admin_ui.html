@@ -1203,7 +1203,7 @@ function renderEvolve(){
   right+=progressCard("写作特征 ↔ 表现数据配对",pr.paired||0,pr.total||1,
     ["配对率 "+(M.pairRate!=null?M.pairRate+"%":"—"),"配对成功的文章才进入策略样本；标题不一致时按字符集合相似度兜底。"],"chart");
   right+=progressCard("单篇互动明细补全",dc.filled||0,dc.total||1,
-    ["补全率 "+(M.detailRate!=null?M.detailRate+"%":"—"),"收藏 / 在看 / 点赞来自单篇明细；满 7 天定格后每篇只拉一次。"],"download");
+    ["补全率 "+(M.detailRate!=null?M.detailRate+"%":"—"),"收藏 / 在看 / 点赞来自单篇明细；发表满 7 天才能拉取，定格后仍可手动重拉刷新。"],"download");
   right+=progressCard("真实实验样本（非回填）",real,3,
     ["还差 "+M.gapReal+" 篇","策略版本发布后写的文章，命中组 / 控制组各 ≥3 篇才给显著性结论；当前回填样本只作观测。"],"clock");
   right+=cells([["配对率",M.pairRate!=null?M.pairRate+"%":"—"],["补全率",M.detailRate!=null?M.detailRate+"%":"—"],

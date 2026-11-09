@@ -450,7 +450,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": False, "error": str(e), "samples": [], "total": 0})
             return
         if path == "/api/strategy/detail-status":
-            # 第五批：文章管理页逐篇「满 7 天 / 已定格 / 可拉取」状态（不联网）
+            # 第五批 v3：文章管理页逐篇「满 7 天 / 已定格 / 可拉取 / 可重拉」状态（不联网）
             try:
                 import strategy_engine
                 self._send(200, strategy_engine.detail_status())
@@ -772,10 +772,13 @@ class Handler(BaseHTTPRequestHandler):
             body = self._read_body()
             try:
                 import strategy_engine
+                # scope: missing(默认，到期未定格) / frozen(到期已定格，显式重拉) / all
+                # 三种 scope 都在 strategy_engine 内强制要求发表满 7 天
                 res = strategy_engine.fetch_detail_batch(
                     article_ids=body.get("articleIds"),
                     dry_run=bool(body.get("dryRun")),
-                    pause=float(body.get("pause", 1.5)))
+                    pause=float(body.get("pause", 1.5)),
+                    scope=str(body.get("scope") or "missing"))
                 if res.get("okCount") and not body.get("dryRun"):
                     try:
                         res["strategySynced"] = strategy_engine.refresh_strategy_snapshot()

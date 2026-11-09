@@ -765,6 +765,11 @@ def absorb_single_file(data_b64, filename=""):
 # 不挂定时任务、不后台轮询：只有 POST /api/strategy/fetch-detail(s) 才会联网。
 # state/detail_index.json 是 msgid 台账与定格状态的唯一真源；feedback.jsonl 只存表现，
 # stats_cache.json 只供管理台 KPI 读取，三者互不覆盖。
+#
+# v3 口径（2026-11-09）：定格 ≠ 永久锁。发表满 FREEZE_DAYS 天的文章，无论是否定格，
+# 都可以由用户显式重拉（补画像 / 修数据），成功后刷新 frozenAt 并累计 refetchCount；
+# 未满 FREEZE_DAYS 天一律拒绝，这是后端硬门槛，不依赖前端判断。
+# 默认批量仍只补「到期且未定格」的缺口，重拉必须走 scope=frozen 的显式入口。
 FREEZE_DAYS = 7
 _MSGID_SCAN_CACHE = {"sig": "", "rows": []}
 
@@ -895,7 +900,7 @@ def detail_status(freeze_days=FREEZE_DAYS):
     sess = mp_session.status()
     today = date.today()
     out = {}
-    due_n = frozen_n = no_msgid = 0
+    due_n = frozen_n = no_msgid = refetch_n = 0
     for i, a in enumerate(idx):
         title = str(a.get("title") or "")
         ent = _resolve_detail_entry(title, items)
@@ -920,19 +925,31 @@ def detail_status(freeze_days=FREEZE_DAYS):
             frozen_n += 1
         if due and not msgid:
             no_msgid += 1
+        # canFetch 不再排除 frozen：满 7 天 + 有 msgid + 登录态有效即可拉取；
+        # 未满 7 天（due=False）一律 canFetch=False，前端按钮也不渲染。
+        can_fetch = bool(due and msgid and sess.get("valid"))
+        can_refetch = bool(can_fetch and frozen)
+        if can_refetch:
+            refetch_n += 1
         out[str(i)] = {
             "title": title, "feedTitle": str((ent or {}).get("title") or title),
             "publishDate": pub[:10], "days": days, "due": due, "frozen": frozen,
             "frozenAt": str((ent or {}).get("frozenAt") or ""),
+            "lastFetchedAt": str((ent or {}).get("lastFetchedAt") or ""),
+            "refetchCount": int((ent or {}).get("refetchCount") or 0),
             "msgid": msgid, "visible": visible,
-            # 能否拉取必须单独卡 msgid，不能从 visible 推导（visible 已放开为「到期即显示」）
-            "canFetch": bool(due and msgid and not frozen and sess.get("valid")),
+            # 能否拉取必须单独卡 msgid / due / 登录态，不能从 visible 推导
+            "canFetch": can_fetch,
+            "canRefetch": can_refetch,
             "lastError": str((ent or {}).get("lastError") or ""),
         }
     return {"ok": True, "freezeDays": freeze_days, "today": today.isoformat(),
             "session": sess,
             "summary": {"total": len(idx), "due": due_n, "frozen": frozen_n,
-                        "fetchable": sum(1 for v in out.values() if v["canFetch"]),
+                        # fetchable 仍是「到期且未定格」的缺口数，供默认批量按钮用
+                        "fetchable": sum(1 for v in out.values()
+                                         if v["canFetch"] and not v["frozen"]),
+                        "refetchable": refetch_n,
                         "noMsgid": no_msgid, "noSession": not sess.get("valid")},
             "items": out}
 
@@ -987,13 +1004,24 @@ def mark_frozen(msgid, source="batch"):
                         detailFrom=source, lastError="")
 
 
+def mark_refetched(msgid, source="batch"):
+    """已定格文章显式重拉成功：刷新定格时间、累计次数，便于审计「重拉过几次」。"""
+    doc = _detail_index()
+    cur = doc["items"].get(msgid) or {}
+    n = int(cur.get("refetchCount") or 0) + 1
+    return _detail_mark(msgid, frozenAt=datetime.now().isoformat(timespec="seconds"),
+                        detailFrom=source, lastError="", refetchCount=n)
+
+
 def sync_detail_source(title, source=""):
     """明细写进 feedback 后，同步 detail_index 的溯源与定格状态。
 
     手动导入单篇明细与批量按钮拉取共用同一条收尾：写 detailFrom /
     lastFetchedAt、清 lastError，让「这篇文章的互动数据从哪来」可追溯。
     只有「发表满 7 天且尚未定格」才写 frozenAt：未满 7 天的数据还会继续
-    增长，保留按钮供到期重拉。找不到唯一 msgid 条目时静默跳过，不阻断主流程。
+    增长，不该标成定格。离线导入不刷新已有定格时间；网络显式重拉由
+    mark_refetched() 单独刷新 frozenAt。找不到唯一 msgid 条目时静默跳过，
+    不阻断主流程。
     """
     doc = _detail_index()
     ent = _resolve_detail_entry(title, doc["items"])
@@ -1028,15 +1056,18 @@ def mark_detail_error(msgid, err):
 
 
 def _fetch_one(item, session_valid):
-    """单篇拉取核心：联网 → 解析 → 精确 UPSERT → 定格。任何失败都不标 frozen。"""
+    """单篇拉取核心：联网 → 解析 → 精确 UPSERT → 定格 / 重新定格。
+
+    已定格也允许拉取（用户显式点「重拉」或 scope=frozen 批量），成功后刷新
+    frozenAt；未满 FREEZE_DAYS 天是唯一不可逾越的门槛。任何失败都不改定格状态。
+    """
     import excel_import
     import mp_session
     mid = str(item.get("msgid") or "")
     title = str(item.get("feedTitle") or item.get("title") or "")
-    if item.get("frozen"):
-        return {"ok": False, "error": "已定格，不再重复拉取"}
+    was_frozen = bool(item.get("frozen"))
     if not item.get("due"):
-        return {"ok": False, "error": "未满 7 天，数据尚未收敛"}
+        return {"ok": False, "error": "未满 %d 天，数据尚未收敛，不可拉取" % FREEZE_DAYS}
     if not mid:
         return {"ok": False, "error": "缺少 msgid：请先导入含「内容url」的 total_*.xls"}
     if not session_valid:
@@ -1060,8 +1091,12 @@ def _fetch_one(item, session_valid):
         mark_detail_error(mid, res.get("reason") or res.get("error") or "写入失败")
         return {**res, "msgid": mid}
     frozen_at = datetime.now().isoformat(timespec="seconds")
-    mark_frozen(mid, "batch:" + mid)
-    return {**res, "msgid": mid, "frozenAt": frozen_at, "bytes": len(raw)}
+    if was_frozen:
+        mark_refetched(mid, "batch:" + mid)
+    else:
+        mark_frozen(mid, "batch:" + mid)
+    return {**res, "msgid": mid, "frozenAt": frozen_at,
+            "refetched": was_frozen, "bytes": len(raw)}
 
 
 def fetch_detail(article_id, dry_run=False):
@@ -1080,20 +1115,33 @@ def fetch_detail(article_id, dry_run=False):
 
 
 def fetch_detail_batch(article_ids=None, dry_run=False, pause=1.5,
-                       freeze_days=FREEZE_DAYS):
-    """一键拉取：到期(days>=7) + 未定格 + 有 msgid 的全部文章，逐篇间隔 pause 秒、不并发。"""
+                       freeze_days=FREEZE_DAYS, scope="missing"):
+    """批量拉取：scope=missing(默认，补缺口) / frozen(显式重拉) / all。
+
+    三种 scope 都硬性要求 due（发表满 freeze_days 天）且有 msgid；未满 7 天
+    绝不进入 targets。逐篇间隔 pause 秒、不并发，失败不刷新定格。
+    """
+    if scope not in ("missing", "frozen", "all"):
+        return {"ok": False, "error": "invalid scope", "results": []}
     st = detail_status(freeze_days)
     keys = sorted(st["items"].keys(), key=lambda k: int(k))
     if article_ids is not None:
         want = {str(x) for x in article_ids}
         keys = [k for k in keys if k in want]
-    targets = [(k, st["items"][k]) for k in keys
-               if st["items"][k]["due"] and not st["items"][k]["frozen"]
-               and st["items"][k]["msgid"]]
+
+    def _in_scope(v):
+        if not v["due"] or not v["msgid"]:
+            return False
+        if scope == "all":
+            return True
+        return bool(v["frozen"]) if scope == "frozen" else not v["frozen"]
+
+    targets = [(k, st["items"][k]) for k in keys if _in_scope(st["items"][k])]
     if dry_run:
-        return {"ok": True, "dryRun": True, "total": len(targets),
+        return {"ok": True, "dryRun": True, "total": len(targets), "scope": scope,
                 "targets": [{"articleId": int(k), "title": v["title"],
                              "publishDate": v["publishDate"], "days": v["days"],
+                             "frozen": v["frozen"],
                              "msgid": v["msgid"]} for k, v in targets],
                 "session": st["session"]}
     results = []
@@ -1107,7 +1155,7 @@ def fetch_detail_batch(article_ids=None, dry_run=False, pause=1.5,
             time.sleep(pause)
     ok = sum(1 for r in results if r.get("ok"))
     return {"ok": ok == len(results), "total": len(targets), "okCount": ok,
-            "failed": len(results) - ok, "results": results,
+            "failed": len(results) - ok, "results": results, "scope": scope,
             "session": st["session"], "freezeDays": freeze_days}
 
 
