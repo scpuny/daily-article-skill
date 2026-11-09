@@ -325,7 +325,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/stats":
             # 纯本地快照，不打网络，保证首屏秒开
-            self._send(200, stats_provider.snapshot())
+            snap = stats_provider.snapshot()
+            # 用别名导入：do_GET 后续分支有局部 import strategy_engine，
+            # 直接同名 import 会把整个函数的名字变成局部变量（历史踩过坑）。
+            try:
+                import strategy_engine as _se
+                snap["profile"] = _se.profile_summary()
+            except Exception:
+                snap["profile"] = None
+            self._send(200, snap)
             return
         if path == "/api/data/health":
             # 全链路只读体检：台账错位 / 数值分叉 / 日汇总 / 定格溯源 / 策略过期

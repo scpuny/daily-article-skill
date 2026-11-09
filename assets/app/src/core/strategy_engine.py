@@ -469,6 +469,169 @@ def parse_single_detail(text):
     return out if any(k in out for k in ("fav", "share", "watch", "thumb", "read")) else {}
 
 
+# ------------------------------------------------ 单篇明细扩展区块（渠道 / 转化漏斗 / 人群画像）
+# 网络入口 mp_session.download_detail(action=detailpage&download=1) 与后台手动下载的
+# 离线 .xls 是同一份文件，两条链路都经 excel_import.parse() 转 CSV 后汇入此处。
+# 因此只解析一次即可双端生效：离线是保底，网络拉取是主路径（数据更新、无需人工下载）。
+DETAIL_SECTIONS = {
+    "阅读转化": "funnel", "阅读数据趋势明细": "trend",
+    "性别分布": "gender", "年龄分布": "age", "地域分布": "region",
+}
+FUNNEL_KEYS = {
+    "送达人数": "delivered", "公众号消息阅读人数": "msgRead",
+    "首次分享人数": "firstShare", "总分享人数": "totalShare",
+    "分享产生的阅读人数": "shareRead",
+}
+_SECTION_HEADERS = ("数据指标", "性别", "年龄", "省份/直辖市", "日期")
+
+
+def _pnum(s):
+    try:
+        return float(str(s).strip().rstrip("%").replace(",", ""))
+    except (ValueError, TypeError):
+        return None
+
+
+def parse_detail_sections(text):
+    """按区块切开单篇明细 CSV。
+
+    overview 仍由 parse_single_detail() 负责（to_csv 会吞掉「数据概况」标题行）；
+    trend 是 4 列（日期|渠道|阅读|分享），其余区块是 2 列（键|值）。
+    """
+    import csv
+    cur, out = None, {}
+    for line in (text or "").splitlines():
+        cells = [c.strip() for c in next(csv.reader([line]))]
+        title = cells[1] if len(cells) > 1 else ""
+        if title in DETAIL_SECTIONS:
+            cur = DETAIL_SECTIONS[title]
+            out.setdefault(cur, [])
+            continue
+        if cur is None:
+            continue
+        vals = [c for c in cells[1:] if c]
+        if not vals or vals[0] in _SECTION_HEADERS:
+            continue
+        if cur == "trend":
+            # 数值在第 3 列，vals[1] 是中文渠道名（不是数字）
+            if len(vals) >= 3 and _pnum(vals[2]) is not None:
+                out[cur].append(vals[:4])
+        elif len(vals) >= 2 and _pnum(vals[1]) is not None:
+            out[cur].append(vals[:2])
+    return out
+
+
+def derive_profile(text, vals=None):
+    """单篇 → {funnel, channels, trend, profile, metrics}；无扩展区块返回 {}。"""
+    sec = parse_detail_sections(text)
+    if not any(sec.get(k) for k in ("funnel", "trend", "gender", "age", "region")):
+        return {}
+    ov = vals if vals is not None else parse_single_detail(text)
+    read = int(ov.get("read") or 0)
+
+    def dist(key):
+        return {r[0]: _pnum(r[1]) for r in sec.get(key, [])
+                if len(r) > 1 and _pnum(r[1]) is not None}
+
+    gender, age, region = dist("gender"), dist("age"), dist("region")
+    funnel = {FUNNEL_KEYS[r[0]]: _pnum(r[1]) for r in sec.get("funnel", [])
+              if r[0] in FUNNEL_KEYS and len(r) > 1 and _pnum(r[1]) is not None}
+    channels, trend = {}, []
+    for r in sec.get("trend", []):
+        trend.append({"date": r[0], "channel": r[1], "read": _pnum(r[2]),
+                      "share": _pnum(r[3]) if len(r) > 3 else 0})
+        if r[1] != "全部":
+            channels[r[1]] = channels.get(r[1], 0) + (_pnum(r[2]) or 0)
+    ch_total = sum(channels.values()) or 0
+    core_age = sum(v for k, v in age.items() if k.startswith(("26-35", "36-45")))
+    delivered, msg_read = funnel.get("delivered"), funnel.get("msgRead")
+    total_share, share_read = funnel.get("totalShare"), funnel.get("shareRead")
+    metrics = {
+        "n": read,
+        "malePct": gender.get("男"),
+        "coreAgePct": round(core_age, 2) if core_age else None,
+        "topRegion": max(region, key=region.get) if region else None,
+        "topRegionPct": max(region.values()) if region else None,
+        "regionCount": len([k for k in region if k != "未知"]),
+        "regionHHI": round(sum((v / 100) ** 2 for v in region.values()), 3) if region else None,
+        "recommendPct": round(channels.get("推荐", 0) / ch_total * 100, 1) if ch_total else None,
+        "deliverOpenRate": round(msg_read / delivered * 100, 2)
+                           if delivered and msg_read is not None else None,
+        "shareViral": round(share_read / total_share, 2)
+                      if total_share and share_read is not None else None,
+    }
+    return {"funnel": funnel, "channels": channels, "trend": trend,
+            "profile": {"gender": gender, "age": age, "region": region, "n": read},
+            "metrics": metrics}
+
+
+def _profile_patch(text, vals):
+    """扩展区块 → feedback 行增量字段。无区块返回 {}，旧行不受影响。"""
+    d = derive_profile(text, vals)
+    if not d:
+        return {}
+    return {"funnel": d["funnel"], "channels": d["channels"], "trend": d["trend"],
+            "profile": d["profile"], "metrics": d["metrics"]}
+
+
+def profile_summary():
+    """聚合所有带画像的 feedback 行，供大屏 /api/stats 展示（只读、不写盘）。
+
+    按各篇阅读人数 n 加权，避免小样本（如 n=30）与大盘（n=240）等权拉偏结论。
+    """
+    rows = _jsonl("feedback.jsonl")
+    total = len([r for r in rows if r.get("title")])
+    covered = [r for r in rows if r.get("profile")]
+    if not covered:
+        return {"covered": 0, "total": total, "gap": total, "n": 0,
+                "metrics": {}, "channels": {}, "byArticle": [], "stability": {}}
+
+    def n_of(r):
+        return _pnum((r.get("profile") or {}).get("n")) or 0
+
+    def wavg(key):
+        pairs = [(_pnum((r.get("metrics") or {}).get(key)), n_of(r)) for r in covered]
+        pairs = [(v, n) for v, n in pairs if v is not None and n]
+        return round(sum(v * n for v, n in pairs) / sum(n for _, n in pairs), 2) if pairs else None
+
+    def rng(key):
+        vs = [_pnum((r.get("metrics") or {}).get(key)) for r in covered]
+        vs = [v for v in vs if v is not None]
+        return round(max(vs) - min(vs), 2) if len(vs) > 1 else None
+
+    channels, region_total = {}, {}
+    for r in covered:
+        for k, v in (r.get("channels") or {}).items():
+            channels[k] = channels.get(k, 0) + (_pnum(v) or 0)
+        n = n_of(r)
+        for k, v in ((r.get("profile") or {}).get("region") or {}).items():
+            if k != "未知":
+                region_total[k] = region_total.get(k, 0) + (_pnum(v) or 0) * n
+    by_article = [{
+        "title": r.get("title"), "date": r.get("date"), "n": n_of(r),
+        "recommendPct": (r.get("metrics") or {}).get("recommendPct"),
+        "malePct": (r.get("metrics") or {}).get("malePct"),
+        "deliverOpenRate": (r.get("metrics") or {}).get("deliverOpenRate"),
+        "source": r.get("detailFrom") or "",
+    } for r in covered]
+    return {
+        "covered": len(covered), "total": total, "gap": max(0, total - len(covered)),
+        "n": int(sum(n_of(r) for r in covered)),
+        "metrics": {
+            "malePct": wavg("malePct"), "coreAgePct": wavg("coreAgePct"),
+            "recommendPct": wavg("recommendPct"),
+            "deliverOpenRate": wavg("deliverOpenRate"),
+            "shareViral": wavg("shareViral"), "regionHHI": wavg("regionHHI"),
+            "topRegion": max(region_total, key=region_total.get) if region_total else None,
+            "regionCount": len(region_total),
+        },
+        "channels": channels,
+        "byArticle": sorted(by_article, key=lambda x: x["n"], reverse=True),
+        "stability": {"malePctRange": rng("malePct"),
+                      "recommendPctRange": rng("recommendPct")},
+    }
+
+
 def _detail_patch(vals, source):
     """单篇明细 → feedback 行的互动字段补丁（第四批手动导入 / 第五批按钮拉取共用）。
 
@@ -497,9 +660,13 @@ def _same_detail_values(r, patch):
     return all(r.get(k) == v for k, v in patch.items() if k != "detailFrom")
 
 
+_DETAIL_FIELD_KEYS = ("fav", "watch", "thumb", "like", "listen", "follow",
+                     "reward", "comment", "completeRate", "dwellSec")
+
+
 def _detail_fields(patch):
-    """回给前端的字段不含溯源标签，避免把文件名当业务指标展示。"""
-    return {k: v for k, v in patch.items() if k != "detailFrom"}
+    """只回互动字段：画像/渠道是大对象，不该塞进 toast 的字段回显。"""
+    return {k: v for k, v in patch.items() if k in _DETAIL_FIELD_KEYS}
 
 
 def _sync_stats_cache_interaction():
@@ -562,6 +729,7 @@ def absorb_single_detail(text, filename=""):
                 "reason": f"标题命中 {len(hits)} 篇（需唯一命中），跳过以防错补"}
     r = rows[hits[0]]
     patch = _detail_patch(vals, filename)
+    patch.update(_profile_patch(text, vals))      # 离线入口：画像/渠道/漏斗
     if _same_detail_values(r, patch):
         # 台账已补全但快照可能仍是旧的（本次修复前导入的），仍做一次增量对齐
         synced = _sync_stats_cache_interaction()
@@ -769,7 +937,7 @@ def detail_status(freeze_days=FREEZE_DAYS):
             "items": out}
 
 
-def absorb_single_values(vals, title, date_str="", source="batch"):
+def absorb_single_values(vals, title, date_str="", source="batch", text=""):
     """第五批精确 UPSERT：已知 (title, date) 直接命中，不靠截断文件名猜标题。
 
     只补互动字段；完成后必须调用 _sync_stats_cache_interaction()，否则管理台 KPI 仍是 0。
@@ -785,6 +953,8 @@ def absorb_single_values(vals, title, date_str="", source="batch"):
                 "reason": f"标题命中 {len(hits)} 篇（需唯一命中），跳过以防错补"}
     r = rows[hits[0]]
     patch = _detail_patch(vals, source)
+    if text:
+        patch.update(_profile_patch(text, vals))  # 网络入口：同一份 xls 的扩展区块
     if _same_detail_values(r, patch):
         synced = _sync_stats_cache_interaction()
         detail = sync_detail_source(r.get("title"), source)
@@ -885,7 +1055,7 @@ def _fetch_one(item, session_valid):
         mark_detail_error(mid, "不是单篇明细键值区")
         return {"ok": False, "error": "下载内容不是单篇数据明细（未识别到键值区）", "msgid": mid}
     res = absorb_single_values(vals, title, item.get("publishDate") or "",
-                               source="batch:" + mid)
+                               source="batch:" + mid, text=text)
     if not res.get("ok"):
         mark_detail_error(mid, res.get("reason") or res.get("error") or "写入失败")
         return {**res, "msgid": mid}

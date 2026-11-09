@@ -1397,21 +1397,38 @@ function renderPillars(){
   requestAnimationFrame(()=>document.querySelectorAll("#pillars .fill").forEach(f=>f.style.width=f.dataset.w+"%"));
 }
 
-// 传播视图：网页端导出快照为唯一数据源，只展示快照与互动指标
+// 传播视图：网络拉取 / 离线 .xls 双入口共用解析链路，展示快照、互动、渠道与受众指标
 function renderGuide(){
   const s=stats||{},R=s.remoteSummary||{},M=derive();
   const good=s.source!=="none";
   const last=(s.daily||[]).reduce((m,d)=>d.date>m?d.date:m,"");
+  const P=(stats&&stats.profile)||{}, pm=P.metrics||{}, ch=P.channels||{};
   const summary=good?`${M.dailyN} 天日粒度 · ${M.artN} 条明细 · 截至 ${last||"—"}`:"尚未导入传播快照，本地指标仍实时计算";
   let html=`<div class="stack"><div class="status-card ${good?'good':''}">
     <div class="t">${good?"传播数据快照":"暂无传播快照"}</div>
     <div class="m">${esc(summary)}</div>
-    <div class="sub">来源：<b style="color:#46e6ff">公众号后台网页端导出</b>${s.updatedAt?" · 更新 "+esc(String(s.updatedAt).slice(0,16)):""}</div></div>`;
+    <div class="sub">来源：<b style="color:#46e6ff">扫码登录态网络拉取 / 离线 .xls</b> · 画像覆盖 ${fmt(P.covered||0)}/${fmt(P.total||0)} 篇${s.updatedAt?" · 更新 "+esc(String(s.updatedAt).slice(0,16)):""}</div></div>`;
   html+=stepBar([
-    {label:"网页端导出",state:good?"done":"now",tip:"公众号后台 → 内容分析 / 图文分析 → 导出单篇或总表 .xls；也可在管理台用扫码登录态一键拉取"},
-    {label:"导入快照",state:good?"done":"",tip:"点右上「导入数据」选择导出的 .xls，一次性快照立即显示真实图表"},
+    {label:"网络/离线取数",state:good?"done":"now",tip:"主路径：管理台「拉取明细」用扫码登录态直接下载单篇 .xls，拿到的是最新快照；保底：公众号后台手动导出到下载目录再导入。两者是同一份文件，共用解析链路"},
+    {label:"解析入库",state:good?"done":"",tip:"两条入口拿到的是同一份单篇 .xls：网络拉取直接进内存解析；离线保底则用「导入数据」选文件。画像 / 渠道 / 转化漏斗共用一套解析器"},
     {label:"看指标",state:good?"now":"",tip:"传播表现视图展示阅读 / 互动 / 篇均 / 发文×阅读相关系数；本地指标始终实时计算"}
   ]);
+  html+=`<div class="st-sec">流量结构${qmark("单篇明细「阅读数据趋势明细」按渠道汇总；推荐占比 = 推荐阅读 / 各渠道阅读之和；送达打开率 = 公众号消息阅读人数 / 送达人数；分享裂变 = 分享产生的阅读人数 / 总分享人数。多篇文章按阅读人数加权")}</div>`+cells([
+    ["推荐占比",pm.recommendPct!=null?pm.recommendPct+"%":"—"],
+    ["送达打开率",pm.deliverOpenRate!=null?pm.deliverOpenRate+"%":"—"],
+    ["分享裂变",pm.shareViral!=null?pm.shareViral:"—"],
+    ["渠道数",Object.keys(ch).length||"—"],
+    ["已覆盖",`${fmt(P.covered||0)} / ${fmt(P.total||0)} 篇`],
+    ["样本基数",`${fmt(P.n||0)} 人`]
+  ]);
+  html+=`<div class="st-sec">受众结构${qmark("单篇明细性别 / 年龄 / 地域分布；26-45 岁为 26-35 与 36-45 两档之和；地域 HHI = 各省占比平方和，越小越分散。按阅读人数加权，小样本篇会带 n 标记，不作为结论")}</div>`+cells([
+    ["男性占比",pm.malePct!=null?pm.malePct+"%":"—"],
+    ["26-45岁",pm.coreAgePct!=null?pm.coreAgePct+"%":"—"],
+    ["TOP1省份",pm.topRegion||"—"],
+    ["省份数",pm.regionCount!=null?pm.regionCount:"—"],
+    ["地域HHI",pm.regionHHI!=null?pm.regionHHI:"—"],
+    ["待补全",`${fmt(P.gap||0)} 篇`]
+  ])
   html+=`<div class="st-sec">快照健康度${qmark("日粒度天数、明细条数、快照距今小时数、零阅读篇数、明细覆盖率、日均阅读；覆盖率 = 明细条数 / 本地文章数")}</div>`+cells([
     ["日粒度",`${M.dailyN} 天`],["明细",`${M.artN} 条`],["距今",`${M.freshH??"—"} h`],
     ["零阅读",`${M.zeroRead} 篇`],["覆盖率",M.cover!=null?M.cover+"%":"—"],["日均阅读",M.avgDailyRead??"—"]
