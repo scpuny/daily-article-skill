@@ -488,9 +488,23 @@
   .mrow b{flex:0 0 46px;text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums}
   .mfoot{font-size:9.5px;color:var(--muted);display:flex;gap:12px;align-items:center}
   .mfoot i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
-  /* KPI 卡内迷你走势 */
-  .kpi .kspark{position:absolute;right:9px;top:13px;width:78px;height:30px;opacity:.72;pointer-events:none}
-  .kpi .kspark path{fill:none;stroke:var(--cyan);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  /* KPI 卡内 mini 区域折线图：渐变面积 + 描边动画 + 末端光点，颜色跟随卡片主色 */
+  .kpi .kspark{position:absolute;right:8px;top:11px;width:88px;height:36px;opacity:.9;
+    overflow:visible;cursor:help;transition:opacity .18s}
+  .kpi:hover .kspark{opacity:1}
+  .kpi .kspark .ks-base{fill:none;stroke:rgba(127,147,184,.22);stroke-width:.8}
+  .kpi .kspark .ks-area{stroke:none;animation:ksFade .9s ease-out .1s both}
+  .kpi .kspark .ks-line{fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:1;stroke-dashoffset:1;animation:ksDraw 1s cubic-bezier(.25,.8,.3,1) .05s both;
+    transition:stroke-width .18s}
+  .kpi .kspark:hover .ks-line{stroke-width:2.4}
+  .kpi .kspark .ks-dot,.kpi .kspark .ks-halo{transform-box:fill-box;transform-origin:center}
+  .kpi .kspark .ks-dot{animation:ksPop .45s ease-out .95s both}
+  .kpi .kspark .ks-halo{animation:ksPulse 2.6s ease-out 1.4s infinite}
+  @keyframes ksFade{from{opacity:0}to{opacity:1}}
+  @keyframes ksDraw{to{stroke-dashoffset:0}}
+  @keyframes ksPop{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
+  @keyframes ksPulse{0%{opacity:.55;transform:scale(.6)}70%{opacity:0;transform:scale(2)}100%{opacity:0;transform:scale(2)}}
   @media (max-width:1500px){
     .dash{grid-template-rows:auto auto auto auto auto}
     .stage.wall-on{height:auto}
@@ -922,13 +936,43 @@ function setView(v){
 }
 
 // ---------- KPI ----------
-/* KPI 卡右上角迷你走势：与卡片指标同源的真实序列，不是装饰随机数 */
-function sparkline(vals){
+/* KPI 卡右上角 mini 区域折线图：与卡片指标同源的真实序列，不是装饰随机数。
+   面积用纵向渐变，描边用横向渐亮渐变；常量序列居中绘制，避免贴底看不见面积。 */
+let _ksUid=0;
+const KS_COLOR={"var(--ok)":"#27e0a0","var(--warn)":"#ffb547","var(--danger)":"#ff6b6b",
+  "var(--cyan)":"#46e6ff"};
+function sparkline(vals,color,label){
   if(!vals||vals.length<2)return "";
-  const W=78,H=30,p=3,min=Math.min(...vals),max=Math.max(...vals),sp=(max-min)||1;
-  const X=i=>p+(W-2*p)*i/(vals.length-1),Y=v=>H-p-(H-2*p)*(v-min)/sp;
-  const d=vals.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
-  return `<svg class="kspark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d}"/></svg>`;
+  const W=88,H=36,p=3,c=KS_COLOR[color]||"#46e6ff";
+  const nums=vals.map(v=>Number(v)||0),mn=Math.min(...nums),mx=Math.max(...nums);
+  const flat=mx===mn,sp=(mx-mn)||1;
+  const X=i=>p+(W-2*p)*i/(nums.length-1);
+  const Y=v=>flat?H*.46:H-p-(H-2*p)*(v-mn)/sp;
+  const pts=nums.map((v,i)=>[X(i),Y(v)]);
+  const line=pts.map((q,i)=>`${i?"L":"M"}${q[0].toFixed(1)} ${q[1].toFixed(1)}`).join(" ");
+  const bottom=H-.6,last=pts[pts.length-1],first=pts[0];
+  const area=`${line} L${last[0].toFixed(1)} ${bottom} L${first[0].toFixed(1)} ${bottom} Z`;
+  const id="ks"+(++_ksUid),delta=nums[nums.length-1]-nums[0];
+  const tip=esc(`${label||"走势"} · 窗口走势 近 ${nums.length} 期：`+
+    `${fmt(nums[0])} → ${fmt(nums[nums.length-1])}`+
+    `（${delta>=0?"+":""}${fmt(+delta.toFixed(2))}）· 峰 ${fmt(+mx.toFixed(2))}`);
+  return `<svg class="kspark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" data-tip="${tip}" aria-hidden="true">
+    <defs>
+      <linearGradient id="${id}a" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${c}" stop-opacity=".48"/>
+        <stop offset="1" stop-color="${c}" stop-opacity="0"/></linearGradient>
+      <linearGradient id="${id}l" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="${c}" stop-opacity=".28"/>
+        <stop offset="1" stop-color="${c}" stop-opacity="1"/></linearGradient>
+    </defs>
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" pointer-events="all"/>
+    <path class="ks-base" d="M${p} ${bottom} H${W-p}"/>
+    <path class="ks-area" d="${area}" fill="url(#${id}a)"/>
+    <path class="ks-line" d="${line}" pathLength="1" stroke="url(#${id}l)"
+      style="filter:drop-shadow(0 0 3px ${c})"/>
+    <circle class="ks-halo" cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.4" fill="${c}"/>
+    <circle class="ks-dot" cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="1.9" fill="${c}"/>
+  </svg>`;
 }
 function renderKPIs(){
   const L=(stats&&stats.local)||{}, R=(stats&&stats.remoteSummary)||null;
@@ -1009,7 +1053,7 @@ function renderKPIs(){
   data.forEach((d,i)=>{if(seqs[i]&&seqs[i].length>1)d.seq=seqs[i];});
   $("kpis").innerHTML=data.map(d=>`<div class="kpi"><div class="lab">${d.lab}</div>
     <div class="val" style="color:${d.c||'#fff'}">${d.val}<small>${d.unit}</small></div>
-    <div class="spark ${d.dim?'dim':''}">${d.spark||""}</div>${d.seq?sparkline(d.seq):""}</div>`).join("");
+    <div class="spark ${d.dim?'dim':''}">${d.spark||""}</div>${d.seq?sparkline(d.seq,d.c,d.lab):""}</div>`).join("");
 }
 
 // ---------- 中间三栏 ----------

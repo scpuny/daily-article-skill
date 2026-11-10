@@ -142,7 +142,10 @@ rings, structure radar (last 14 days vs all-time), pillar rose chart, tag bars, 
 heatmap, length histogram, and 7-day momentum. All inline SVG/CSS — no chart library,
 no network calls, no fabricated numbers. Because only one article is published per day,
 there is deliberately no "articles per day" bar chart (it would be a flat row of 1s).
-The other four views keep the original three-panel layout.
+Each of the six KPI cards carries a mini area line chart driven by the same real series
+(gradient fill, animated stroke, end dot; hover shows window start/end, delta and peak).
+Only views with a genuine time series (内容生产 / 传播表现) show these charts — no
+fabricated sequences. The other four views keep the original three-panel layout.
 
 ## Known pitfall: code-block spacing in drafts
 
