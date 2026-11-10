@@ -134,6 +134,16 @@ never hardcoded — swap accounts by editing `data/secrets.json` + `data/config.
   statistics API is no longer used; reach data comes from web-console exports.
 - `data/themes.json` — theme definitions (safe to ship).
 
+## Dashboard chart wall
+
+The default "内容生产" view renders a wall of 8 charts (9 on narrower screens) computed
+purely from the local ledger: cumulative word curve, daily word bars, four completion
+rings, structure radar (last 14 days vs all-time), pillar rose chart, tag bars, 14-day
+heatmap, length histogram, and 7-day momentum. All inline SVG/CSS — no chart library,
+no network calls, no fabricated numbers. Because only one article is published per day,
+there is deliberately no "articles per day" bar chart (it would be a flat row of 1s).
+The other four views keep the original three-panel layout.
+
 ## Known pitfall: code-block spacing in drafts
 
 WeChat's editor trims whitespace-only `<span>`s, which used to turn `SELECT id` into
