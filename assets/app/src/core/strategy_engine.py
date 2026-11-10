@@ -28,6 +28,7 @@ import math
 import os
 import re
 import sys
+import threading
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -809,16 +810,27 @@ def absorb_single_file(data_b64, filename=""):
     return absorb_single_detail(text, filename)
 
 
-# ================================================================ 第五批：手动拉取 + 7 天定格
+# ================================================================ 第五批：手动拉取 + 采集台账
 # 不挂定时任务、不后台轮询：只有 POST /api/strategy/fetch-detail(s) 才会联网。
-# state/detail_index.json 是 msgid 台账与定格状态的唯一真源；feedback.jsonl 只存表现，
+# state/detail_index.json 是 msgid 台账与采集状态的唯一真源；feedback.jsonl 只存表现，
 # stats_cache.json 只供管理台 KPI 读取，三者互不覆盖。
 #
-# v3 口径（2026-11-09）：定格 ≠ 永久锁。发表满 FREEZE_DAYS 天的文章，无论是否定格，
-# 都可以由用户显式重拉（补画像 / 修数据），成功后刷新 frozenAt 并累计 refetchCount；
-# 未满 FREEZE_DAYS 天一律拒绝，这是后端硬门槛，不依赖前端判断。
-# 默认批量仍只补「到期且未定格」的缺口，重拉必须走 scope=frozen 的显式入口。
-FREEZE_DAYS = 7
+# v4 口径（2026-11-10）：取消 7 天门槛。公众号每天发文当天就有单篇明细记录，
+# 任何有 msgid 的文章随时可拉；SETTLE_DAYS 只用于「数据是否已收敛」的提示，
+# 不再拦截任何请求。frozenAt 语义改为「已成功采集过一次」——拉取成功即写，
+# 所以 scope=missing 永远只补没拉过的文章，不会随文章变多而重复批量请求。
+#
+# 防大批量三道闸（门槛放开后可拉取的文章变多，必须服务端自己兜住）：
+#   MAX_PER_REQUEST  单次 HTTP 最多处理几篇，绕过前端也无法一次拉全库；
+#   MAX_PLAN_TOTAL   一次任务计划最多排几篇，dryRun 返回 truncated/available；
+#   _FETCH_LOCK      全局互斥，同一时刻只允许一个批量任务在跑；
+#   MIN_PAUSE        逐篇最小间隔，避免被传 pause=0 打成高频请求。
+SETTLE_DAYS = 7
+FREEZE_DAYS = SETTLE_DAYS          # 兼容旧调用方的别名，语义已不再是门槛
+MAX_PER_REQUEST = 10
+MAX_PLAN_TOTAL = 60
+MIN_PAUSE = 1.0
+_FETCH_LOCK = threading.Lock()
 _MSGID_SCAN_CACHE = {"sig": "", "rows": []}
 
 
@@ -933,12 +945,13 @@ def _resolve_detail_entry(title, items):
     return fuzzy[0] if len(fuzzy) == 1 else None
 
 
-def detail_status(freeze_days=FREEZE_DAYS):
+def detail_status(settle_days=SETTLE_DAYS):
     """文章管理页左侧卡片状态：不联网、不触发 build。
 
     会顺带幂等同步 msgid 台账（state/detail_index.json + feedback 的 url/msgid），
     但不改任何表现数据、不拉单篇明细。
     发表日优先取 detail_index 台账（total 表的「发表日期」），再取 feedback，最后回退本地写作日。
+    v4：不再按发表天数拦截；days / settled 只用于提示「数据是否还在增长」。
     """
     import mp_session
     sync_msgids_from_downloads()
@@ -948,7 +961,7 @@ def detail_status(freeze_days=FREEZE_DAYS):
     sess = mp_session.status()
     today = date.today()
     out = {}
-    due_n = frozen_n = no_msgid = refetch_n = 0
+    settled_n = frozen_n = no_msgid = refetch_n = 0
     for i, a in enumerate(idx):
         title = str(a.get("title") or "")
         ent = _resolve_detail_entry(title, items)
@@ -962,39 +975,42 @@ def detail_status(freeze_days=FREEZE_DAYS):
             days = (today - date.fromisoformat(pub[:10])).days
         except (ValueError, TypeError):
             pass
-        due = days is not None and days >= freeze_days
+        # v4：settled 只是「数据基本收敛」的提示标记，不参与任何准入判断。
+        settled = days is None or days >= settle_days
         frozen = bool((ent or {}).get("frozenAt"))
-        # 到期即在卡片上给出状态（含「缺链接」提示），不因缺 msgid 而整块隐藏；
-        # 真正能否拉取仍由 canFetch / fetch_detail_batch 的 msgid 条件把关。
-        visible = bool(due)
-        if due:
-            due_n += 1
+        # 所有卡片都给出状态（含「缺链接」），不再按天数整块隐藏。
+        visible = True
+        if settled:
+            settled_n += 1
         if frozen:
             frozen_n += 1
-        if due and not msgid:
+        if not msgid:
             no_msgid += 1
-        # canFetch 不再排除 frozen：满 7 天 + 有 msgid + 登录态有效即可拉取；
-        # 未满 7 天（due=False）一律 canFetch=False，前端按钮也不渲染。
-        can_fetch = bool(due and msgid and sess.get("valid"))
+        # canFetch 只卡 msgid + 登录态：已定格可重拉、未满收敛天数也可拉取。
+        can_fetch = bool(msgid and sess.get("valid"))
         can_refetch = bool(can_fetch and frozen)
         if can_refetch:
             refetch_n += 1
         out[str(i)] = {
             "title": title, "feedTitle": str((ent or {}).get("title") or title),
-            "publishDate": pub[:10], "days": days, "due": due, "frozen": frozen,
+            "publishDate": pub[:10], "days": days,
+            "due": True,              # 兼容旧前端：v4 起恒 True，不再作门槛
+            "settled": settled, "frozen": frozen,
             "frozenAt": str((ent or {}).get("frozenAt") or ""),
             "lastFetchedAt": str((ent or {}).get("lastFetchedAt") or ""),
             "refetchCount": int((ent or {}).get("refetchCount") or 0),
             "msgid": msgid, "visible": visible,
-            # 能否拉取必须单独卡 msgid / due / 登录态，不能从 visible 推导
+            # 能否拉取必须单独卡 msgid / 登录态，不能从 visible 推导
             "canFetch": can_fetch,
             "canRefetch": can_refetch,
             "lastError": str((ent or {}).get("lastError") or ""),
         }
-    return {"ok": True, "freezeDays": freeze_days, "today": today.isoformat(),
-            "session": sess,
-            "summary": {"total": len(idx), "due": due_n, "frozen": frozen_n,
-                        # fetchable 仍是「到期且未定格」的缺口数，供默认批量按钮用
+    return {"ok": True, "settleDays": settle_days, "freezeDays": settle_days,
+            "maxPerRequest": MAX_PER_REQUEST, "maxPlanTotal": MAX_PLAN_TOTAL,
+            "today": today.isoformat(), "session": sess,
+            "summary": {"total": len(idx), "due": settled_n, "settled": settled_n,
+                        "unsettled": len(idx) - settled_n, "frozen": frozen_n,
+                        # fetchable 仍是「未采集过且可拉」的缺口数，供默认批量按钮用
                         "fetchable": sum(1 for v in out.values()
                                          if v["canFetch"] and not v["frozen"]),
                         "refetchable": refetch_n,
@@ -1062,10 +1078,10 @@ def sync_detail_source(title, source=""):
 
     手动导入单篇明细与批量按钮拉取共用同一条收尾：写 detailFrom /
     lastFetchedAt、清 lastError，让「这篇文章的互动数据从哪来」可追溯。
-    只有「发表满 7 天且尚未定格」才写 frozenAt：未满 7 天的数据还会继续
-    增长，不该标成定格。离线导入不刷新已有定格时间；网络显式重拉由
-    mark_refetched() 单独刷新 frozenAt。找不到唯一 msgid 条目时静默跳过，
-    不阻断主流程。
+    v4：frozenAt 语义改为「首次成功采集」，任何一次成功写入都会补上，
+    不再等满 7 天——否则未满 7 天已拉过的文章会被 scope=missing 反复重拉，
+    文章一多就成了批量重复请求。已有定格时间不刷新；网络显式重拉由
+    mark_refetched() 单独刷新。找不到唯一 msgid 条目时静默跳过，不阻断主流程。
     """
     doc = _detail_index()
     ent = _resolve_detail_entry(title, doc["items"])
@@ -1079,13 +1095,8 @@ def sync_detail_source(title, source=""):
     cur["lastError"] = ""
     frozen = bool(cur.get("frozenAt"))
     if not frozen:
-        try:
-            days = (date.today() - date.fromisoformat(str(cur.get("date") or "")[:10])).days
-        except (ValueError, TypeError):
-            days = None
-        if days is not None and days >= FREEZE_DAYS:
-            cur["frozenAt"] = now
-            frozen = True
+        cur["frozenAt"] = now          # v4：拉取成功即标记「已采集过」，与天数无关
+        frozen = True
     after = (cur.get("detailFrom"), cur.get("frozenAt"), cur.get("lastError"))
     if before == after and cur.get("lastFetchedAt"):
         return {"ok": True, "msgid": mid, "frozen": frozen, "unchanged": True}
@@ -1100,18 +1111,17 @@ def mark_detail_error(msgid, err):
 
 
 def _fetch_one(item, session_valid):
-    """单篇拉取核心：联网 → 解析 → 精确 UPSERT → 定格 / 重新定格。
+    """单篇拉取核心：联网 → 解析 → 精确 UPSERT → 首次采集 / 重新采集。
 
-    已定格也允许拉取（用户显式点「重拉」或 scope=frozen 批量），成功后刷新
-    frozenAt；未满 FREEZE_DAYS 天是唯一不可逾越的门槛。任何失败都不改定格状态。
+    v4：不再校验发表天数，公众号每天发文当天就有明细记录，有 msgid 就能拉。
+    已采集过的文章允许显式重拉，成功后刷新 frozenAt 并累计 refetchCount。
+    未满 SETTLE_DAYS 天的数据仍会增长，界面只提示、不拦截；任何失败都不改采集状态。
     """
     import excel_import
     import mp_session
     mid = str(item.get("msgid") or "")
     title = str(item.get("feedTitle") or item.get("title") or "")
     was_frozen = bool(item.get("frozen"))
-    if not item.get("due"):
-        return {"ok": False, "error": "未满 %d 天，数据尚未收敛，不可拉取" % FREEZE_DAYS}
     if not mid:
         return {"ok": False, "error": "缺少 msgid：请先导入含「内容url」的 total_*.xls"}
     if not session_valid:
@@ -1159,61 +1169,85 @@ def fetch_detail(article_id, dry_run=False):
 
 
 def fetch_detail_batch(article_ids=None, dry_run=False, pause=1.5,
-                       freeze_days=FREEZE_DAYS, scope="missing", limit=0):
-    """批量拉取：scope=missing(默认，补缺口) / frozen(显式重拉) / all。
+                       settle_days=SETTLE_DAYS, scope="missing", limit=0):
+    """批量拉取：scope=missing(默认，补没采过的) / frozen(显式重拉) / all。
 
-    三种 scope 都硬性要求 due（发表满 freeze_days 天）且有 msgid；未满 7 天
-    绝不进入 targets。逐篇间隔 pause 秒、不并发，失败不刷新定格。
+    v4：不按发表天数筛选，只要求有 msgid；未满 SETTLE_DAYS 天的文章照拉，
+    界面只提示「数据可能继续增长」。逐篇间隔至少 MIN_PAUSE 秒、不并发，
+    失败不刷新采集状态。
 
-    文章量增长后的保护（v3.1）：limit 限制单次最多处理多少篇（0=不限），
-    前端先 dryRun 拿固定 articleIds 队列、再按批分片调用，单次 HTTP 只跑几篇
-    不会超时；响应里的 remaining 是本次没处理的剩余篇数。中断续交由前端保存
-    未完成队列实现，不按时间跳过，避免误把刚拉过的文章排除掉。
+    防大批量（门槛放开后可拉取篇数变多，必须由服务端自己兜住）：
+      1. 单次 HTTP 最多 MAX_PER_REQUEST 篇（dryRun 计划最多 MAX_PLAN_TOTAL 篇），
+         超出部分回 available/truncated，按「新文章优先」排队，剩下的下次再拉；
+      2. _FETCH_LOCK 全局互斥，同一时刻只允许一个批量任务在跑；
+      3. pause 下限 MIN_PAUSE，防止被传 0 打成高频请求。
+    remaining 是本次没处理的剩余篇数；中断续交由前端保存未完成队列实现。
     """
     if scope not in ("missing", "frozen", "all"):
         return {"ok": False, "error": "invalid scope", "results": []}
     try:
-        lim = max(0, int(limit or 0))
+        lim_req = max(0, int(limit or 0))
     except (TypeError, ValueError):
         return {"ok": False, "error": "invalid limit", "results": []}
-    st = detail_status(freeze_days)
+    try:
+        pause = max(MIN_PAUSE, min(float(pause or MIN_PAUSE), 10.0))
+    except (TypeError, ValueError):
+        pause = MIN_PAUSE
+    cap = MAX_PLAN_TOTAL if dry_run else MAX_PER_REQUEST
+    lim = min(lim_req, cap) if lim_req else cap
+
+    st = detail_status(settle_days)
     keys = sorted(st["items"].keys(), key=lambda k: int(k))
     if article_ids is not None:
         want = {str(x) for x in article_ids}
         keys = [k for k in keys if k in want]
 
     def _in_scope(v):
-        if not v["due"] or not v["msgid"]:
+        if not v["msgid"]:
             return False
         if scope == "all":
             return True
         return bool(v["frozen"]) if scope == "frozen" else not v["frozen"]
 
+    # 新文章优先：即便计划被上限截断，先处理的也是最近发布的几篇。
     all_targets = [(k, st["items"][k]) for k in keys if _in_scope(st["items"][k])]
-    targets = all_targets[:lim] if lim else all_targets
-    remaining = len(all_targets) - len(targets)
+    all_targets.sort(key=lambda kv: (
+        kv[1]["days"] is None,
+        kv[1]["days"] if kv[1]["days"] is not None else 10 ** 9))
+    targets = all_targets[:lim]
+    available = len(all_targets)
+    remaining = available - len(targets)
     if dry_run:
         return {"ok": True, "dryRun": True, "total": len(targets), "scope": scope,
-                "remaining": remaining, "limit": lim,
+                "available": available, "remaining": remaining,
+                "truncated": remaining > 0, "limit": lim, "maxTotal": cap,
+                "settleDays": settle_days,
                 "targets": [{"articleId": int(k), "title": v["title"],
                              "publishDate": v["publishDate"], "days": v["days"],
-                             "frozen": v["frozen"],
+                             "settled": v["settled"], "frozen": v["frozen"],
                              "msgid": v["msgid"]} for k, v in targets],
                 "session": st["session"]}
-    results = []
-    for i, (k, item) in enumerate(targets):
-        r = _fetch_one(item, st["session"]["valid"])
-        results.append({"articleId": int(k), "title": item["title"], **r})
-        err = str(r.get("error") or "")
-        if err.startswith("登录态"):
-            break                       # 凭证失效，后续必然失败，立即停
-        if pause and i < len(targets) - 1:
-            time.sleep(pause)
+    if not _FETCH_LOCK.acquire(blocking=False):
+        return {"ok": False, "error": "已有拉取任务在运行，请等它结束再试",
+                "busy": True, "results": []}
+    try:
+        results = []
+        for i, (k, item) in enumerate(targets):
+            r = _fetch_one(item, st["session"]["valid"])
+            results.append({"articleId": int(k), "title": item["title"], **r})
+            err = str(r.get("error") or "")
+            if err.startswith("登录态"):
+                break                       # 凭证失效，后续必然失败，立即停
+            if pause and i < len(targets) - 1:
+                time.sleep(pause)
+    finally:
+        _FETCH_LOCK.release()
     ok = sum(1 for r in results if r.get("ok"))
     return {"ok": ok == len(results), "total": len(targets), "okCount": ok,
             "failed": len(results) - ok, "results": results, "scope": scope,
-            "remaining": remaining, "limit": lim,
-            "session": st["session"], "freezeDays": freeze_days}
+            "available": available, "remaining": remaining,
+            "truncated": remaining > 0, "limit": lim, "maxPerRequest": cap,
+            "pause": pause, "session": st["session"], "settleDays": settle_days}
 
 
 def ingest_feedback(download_dir=None, max_files=MAX_FILES):

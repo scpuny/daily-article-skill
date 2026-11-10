@@ -83,7 +83,7 @@
   /* 图标本身不吞鼠标事件，光标继承自按钮，保证 hover/点击都是手指状 */
   .ic{width:1em;height:1em;vertical-align:-.14em;flex:0 0 auto;display:inline-block;
     pointer-events:none;cursor:inherit}
-  /* ---------- 第五批 v3：单篇明细手动拉取（满 7 天才出现；已定格可显式重拉） ---------- */
+  /* ---------- 第五批 v4：单篇明细手动拉取（无发表天数门槛；已采集可显式重拉） ---------- */
   .detailbar{flex:0 0 auto;padding:9px 12px;border-bottom:1px solid var(--border);
     display:flex;flex-direction:column;gap:7px;background:rgba(6,16,36,.38)}
   .detailbar .r{display:flex;gap:6px;align-items:center}
@@ -336,8 +336,8 @@
       </div>
       <div class="detailbar">
         <div class="r">
-          <button class="dbtn" id="fetchAll" disabled data-ic="download" title="一键拉取所有发表满 7 天、未定格且链接齐全的单篇明细；未满 7 天不拉取">拉取明细</button>
-          <button class="dbtn g" id="refetchAll" disabled data-ic="refresh" title="重新拉取所有已满 7 天且已定格的单篇明细，用最新数据覆盖并刷新定格时间；未满 7 天不拉取">重拉定格</button>
+          <button class="dbtn" id="fetchAll" disabled data-ic="download" title="分批拉取所有未采集过、链接齐全的单篇明细；不再限制发表天数，单次最多 60 篇、每批 5 篇，可随时停止">拉取明细</button>
+          <button class="dbtn g" id="refetchAll" disabled data-ic="refresh" title="分批重新拉取已采集过的单篇明细，用最新数据覆盖并刷新采集时间；单次最多 60 篇、每批 5 篇，可随时停止">重拉定格</button>
         </div>
         <div class="r">
           <button class="dbtn g" id="fetchTotal" data-ic="download" title="按当前登录态拉取近 30 天图文总表并导入：刷新 KPI 快照、补 msgid 台账、落盘 ~/Downloads">总表 30 天</button>
@@ -519,9 +519,11 @@ function injectIcons(){
   });
 }
 let articles=[], filtered=[], current=null, statusFilter="all";
-/* 第五批：单篇明细定格状态（后端算好到期与否，前端只负责显示，不自行算日期） */
-let detailState={items:{},session:{valid:false},summary:{},freezeDays:7};
+/* 第五批 v4：单篇明细采集状态（后端算好 msgid/采集状态，前端只显示，不自行算日期）。
+   settleDays 仅用于提示「数据是否还在增长」，不作为任何拦截条件。 */
+let detailState={items:{},session:{valid:false},summary:{},settleDays:7};
 /* 批量分片：文章再多也不会把一次 HTTP 请求拖到超时；每批固定篇数、串行、可停止。
+   后端另有单次请求 10 篇 / 单次计划 60 篇硬上限与全局互斥锁；
    未完成队列存在 sessionStorage，停止/登录态失效后再次点击可接着拉，不重复请求。 */
 const BATCH_SIZE=5, BATCH_PAUSE=1.5;
 let batchRunning=false, batchStop=false;
@@ -621,47 +623,48 @@ function renderList(){
   markOn();
 }
 
-/* ---------- 第五批：卡片按钮 + 一键拉取 + 登录态 ---------- */
+/* ---------- 第五批 v4：卡片按钮 + 分批拉取 + 登录态 ---------- */
 function fetchChip(a){
   const d=(detailState.items||{})[String(a.id)]||{};
-  if(!d.visible)return "";                       // 未满 7 天：完全不显示（后端也拒绝）
-  const se=detailState.session||{}, days=detailState.freezeDays||7;
-  const why=!d.msgid?"缺「内容url」":!d.due?`未满 ${days} 天`:!se.valid?"登录态未配置":"状态未就绪";
+  const se=detailState.session||{}, days=detailState.settleDays||7;
+  const why=!d.msgid?"缺「内容url」":!se.valid?"登录态未配置":"状态未就绪";
   const off=d.canFetch?"":`（暂不可拉取：${why}，点击查看原因）`;
+  // 未满收敛天数只提示「数据仍会增长，可随时重拉」，按钮照常可点。
+  const fresh=d.settled===false?` · 未满 ${days} 天，数据仍会增长，可随时重拉`:"";
   if(d.frozen)return `<button class="fetch redo ${d.canFetch?'':'off'}" data-id="${a.id}" ${d.canFetch?'':'disabled'}
-    title="发表 ${esc(d.publishDate||"")} · 已 ${d.days} 天 · 于 ${esc(d.frozenAt||"")} 定格${d.refetchCount?`（已重拉 ${d.refetchCount} 次）`:""} · ${d.canFetch?"点击重新拉取并覆盖明细/画像":esc(off)}">${icon("refresh")} 重拉</button>`;
+    title="发表 ${esc(d.publishDate||"")} · 已 ${d.days} 天${esc(fresh)} · 于 ${esc(d.frozenAt||"")} 采集${d.refetchCount?`（已重拉 ${d.refetchCount} 次）`:""} · ${d.canFetch?"点击重新拉取并覆盖明细/画像":esc(off)}">${icon("refresh")} 重拉</button>`;
   if(!d.msgid)return `<button class="fetch miss" data-id="${a.id}"
     title="导出总表缺该篇「内容url」，无法拼下载链接；点击看处理办法">${icon("alert")} 缺链接</button>`;
   return `<button class="fetch ${d.canFetch?'':'off'}" data-id="${a.id}"
-    title="拉取单篇数据明细 · 发表 ${esc(d.publishDate||"")} · 已 ${d.days} 天${esc(off)}">${icon("download")} 拉取</button>`;
+    title="拉取单篇数据明细 · 发表 ${esc(d.publishDate||"")} · 已 ${d.days} 天${esc(fresh)}${esc(off)}">${icon("download")} 拉取</button>`;
 }
 
 async function loadDetailStatus(){
   try{
     detailState=await api("GET","/api/strategy/detail-status");
   }catch(e){
-    detailState={items:{},session:{valid:false},summary:{},freezeDays:7};
+    detailState={items:{},session:{valid:false},summary:{},settleDays:7};
   }
   renderDetailBar();
-  renderList();                                  // 按钮状态随定格结果刷新
+  renderList();                                  // 按钮状态随采集结果刷新
 }
 
 function renderDetailBar(){
   const s=detailState.summary||{}, se=detailState.session||{};
   const n=s.fetchable||0, rn=s.refetchable||0;
-  const days=detailState.freezeDays||7;
+  const days=detailState.settleDays||7;
   const b=$("fetchAll");
   b.disabled=!n||!se.valid;
   b.innerHTML=icon("download")+(n?` 拉取（${n} 篇）`:" 拉取明细");
   b.title=!se.valid?"登录态未配置：请先点「登录态」扫码登录"
-    :n?`分批拉取 ${n} 篇（每批 ${BATCH_SIZE} 篇），随时可停止`:`当前没有满 ${days} 天、未定格且链接齐全的文章`;
+    :n?`分批拉取 ${n} 篇未采集过的文章（每批 ${BATCH_SIZE} 篇），随时可停止`:`没有未采集过、链接齐全的文章`;
   const rb=$("refetchAll");
   rb.disabled=!rn||!se.valid;
   rb.innerHTML=icon("refresh")+(rn?` 重拉（${rn} 篇）`:" 重拉定格");
   rb.title=!se.valid?"登录态未配置：请先点「登录态」扫码登录"
-    :rn?`分批重拉 ${rn} 篇（每批 ${BATCH_SIZE} 篇），随时可停止`:`当前没有满 ${days} 天且已定格、可重拉的文章`;
-  const bits=[`满 ${days} 天 <b>${s.due||0}</b> 篇`,`已定格 <b>${s.frozen||0}</b> 篇`];
-  if(rn)bits.push(`可重拉 <b>${rn}</b> 篇`);
+    :rn?`分批重拉 ${rn} 篇已采集过的文章（每批 ${BATCH_SIZE} 篇），随时可停止`:`没有可重拉的文章`;
+  const bits=[`未采集 <b>${n}</b> 篇`,`已采集 <b>${s.frozen||0}</b> 篇`];
+  if(s.unsettled)bits.push(`未满 ${days} 天 <b>${s.unsettled}</b> 篇`);
   if(s.noMsgid)bits.push(`<b class="warn">缺链接 ${s.noMsgid}</b> 篇`);
   bits.push(se.valid?`登录态 <b>已配置</b>（尾号 ${esc(se.tokenTail||"")}）`:`<b class="warn">登录态未配置</b>`);
   $("detailHint").innerHTML=bits.join(" · ");
@@ -671,16 +674,15 @@ function renderDetailBar(){
 }
 
 async function doFetchOne(id,btn){
+  if(batchRunning){toast("批量任务运行中，请等它结束或点「停止」","err");return;}
   const d=(detailState.items||{})[String(id)]||{};
-  const days=detailState.freezeDays||7;
   if(!d.canFetch){
     if(!d.msgid)toast("该篇缺「内容url」：请导入覆盖该篇的 total_*.xls","err");
-    else if(!d.due)toast(`发表未满 ${days} 天，数据尚未收敛，不能拉取`,"err");
     else if(!(detailState.session||{}).valid)toast("请先点「登录态」扫码登录（或兜底粘贴 cURL）","err");
     else toast("当前不可拉取：状态未就绪","err");
     return;
   }
-  if(d.frozen && !confirm(`该篇已于 ${d.frozenAt||"此前"} 定格（已发表 ${d.days} 天）。重新拉取会用最新单篇明细覆盖现有互动与画像数据，并刷新定格时间。是否继续？`))return;
+  if(d.frozen && !confirm(`该篇已于 ${d.frozenAt||"此前"} 采集（已发表 ${d.days} 天）。重新拉取会用最新单篇明细覆盖现有互动与画像数据，并刷新采集时间。是否继续？`))return;
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
   const old=btn?{cls:btn.className,html:btn.innerHTML}:null;
   const setBtn=(cls,txt,ic)=>{if(!btn)return;btn.className=cls;btn.disabled=true;
@@ -693,7 +695,7 @@ async function doFetchOne(id,btn){
     if(r.ok){
       ok=true;
       const f=r.fields||{};
-      toast(`${r.refetched?"已重新拉取并更新定格":"已拉取并定格"} · 收藏 ${f.fav||0} / 在看·点赞 ${f.like||0}`,"ok");
+      toast(`${r.refetched?"已重新采集并更新":"已采集"} · 收藏 ${f.fav||0} / 在看·点赞 ${f.like||0}`,"ok");
       setBtn("fetch ok","完成","check");
       await wait(1100);
     }else{
@@ -709,8 +711,8 @@ async function doFetchOne(id,btn){
   if(ok)await loadDetailStatus();   // 成功后重绘按钮为「↻ 重拉」，失败则原地可重试
 }
 
-/* 批量统一走 /api/strategy/fetch-details，scope 区分「补缺口」与「显式重拉」。
-   文章量大时先 dryRun 拿到固定队列，再按 BATCH_SIZE 分片串行请求：
+/* 批量统一走 /api/strategy/fetch-details，scope 区分「补没采过的」与「显式重拉」。
+   先 dryRun 拿固定队列（后端按新文章优先、单次最多 60 篇），再按 BATCH_SIZE 分片串行请求：
    单次 HTTP 只跑几篇不会超时，进度实时可见，可随时停止，中断后再点只拉剩下的。 */
 function batchProgress(done,total,ok,fail,note){
   $("batchProg").hidden=false;
@@ -721,14 +723,13 @@ function batchProgress(done,total,ok,fail,note){
 }
 async function runBatch(scope,btnId){
   if(batchRunning)return;
-  const days=detailState.freezeDays||7;
   const verb=scope==="frozen"?"重拉":"拉取";
   let plan;
   try{
     plan=await api("POST","/api/strategy/fetch-details",{dryRun:true,scope});
   }catch(e){toast("读取待拉清单失败："+e.message,"err");return;}
   const fresh=(plan.targets||[]).map(t=>t.articleId);
-  if(!fresh.length){saveQueue(scope,[]);toast(scope==="frozen"?"没有可重拉的已定格文章":"没有待拉取的到期文章","err");return;}
+  if(!fresh.length){saveQueue(scope,[]);toast(scope==="frozen"?"没有可重拉的已采集文章":"没有未采集过、链接齐全的文章","err");return;}
   let queue=loadQueue(scope);
   if(queue.length){                       // 上次中断留下的未完成队列
     const allow=new Set(fresh);
@@ -737,15 +738,19 @@ async function runBatch(scope,btnId){
   if(queue.length && !confirm(`上次还有 ${queue.length} 篇未拉完。\n点「确定」继续这 ${queue.length} 篇；点「取消」重新拉全部 ${fresh.length} 篇。`))queue=[];
   if(!queue.length)queue=fresh.slice();
   const total=queue.length;
-  const msg=`将分批${verb} ${total} 篇发表满 ${days} 天的单篇明细：\n`
+  const cap=plan.truncated
+    ?`\n共 ${plan.available} 篇可${verb}，单次上限 ${plan.maxTotal||60} 篇：本次先处理最新的 ${plan.total} 篇，剩 ${plan.remaining} 篇下次点击继续。\n`
+    :"";
+  const msg=`将分批${verb} ${total} 篇单篇明细（不限制发表天数）：\n`
     +`每批 ${BATCH_SIZE} 篇、每篇间隔 ${BATCH_PAUSE} 秒，预计约 ${Math.ceil(total*BATCH_PAUSE)} 秒。\n`
+    +cap
     +`可随时点「停止」；未完成的会自动保存，下次点击可继续，已完成的不会重复请求。\n是否继续？`;
   if(!confirm(msg))return;
   saveQueue(scope,queue);
   batchRunning=true;batchStop=false;
   const b=$(btnId), other=$(scope==="frozen"?"fetchAll":"refetchAll");
   b.classList.add("busy");b.disabled=true;other.disabled=true;
-  let done=0,ok=0,fail=0,sessionDead=false;
+  let done=0,ok=0,fail=0,sessionDead=false,paused=false;
   batchProgress(0,total,0,0);
   try{
     while(queue.length&&!batchStop){
@@ -760,8 +765,15 @@ async function runBatch(scope,btnId){
       }catch(e){
         queue=slice.concat(queue);               // 网络异常：整批放回队列，下次继续
         saveQueue(scope,queue);
-        fail+=slice.length;done+=slice.length;
+        paused=true;fail+=slice.length;done+=slice.length;
         toast(`一批请求失败，任务已暂停：${e.message}`,"err");
+        batchProgress(done,total,ok,fail," · 已暂停");
+        break;
+      }
+      if(r.busy){                               // 另一个标签页/任务正在跑，服务端互斥锁拒绝
+        queue=slice.concat(queue);saveQueue(scope,queue);
+        paused=true;
+        toast(`已有拉取任务在运行，本次已暂停，剩 ${queue.length} 篇`,"err");
         batchProgress(done,total,ok,fail," · 已暂停");
         break;
       }
@@ -773,7 +785,7 @@ async function runBatch(scope,btnId){
       if(sessionDead)break;
     }
   }finally{
-    const left=queue.length, stopped=batchStop||sessionDead;
+    const left=queue.length, stopped=batchStop||sessionDead||paused;
     if(!left && !stopped)saveQueue(scope,[]);  // 全部完成才清队列；中断保留待续拉
     batchProgress(done,total,ok,fail,stopped?` · 已停止（剩 ${left} 篇）`:"");
     toast(sessionDead?"登录态失效，已停止：请重新扫码登录"

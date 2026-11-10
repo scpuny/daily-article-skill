@@ -450,7 +450,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": False, "error": str(e), "samples": [], "total": 0})
             return
         if path == "/api/strategy/detail-status":
-            # 第五批 v3：文章管理页逐篇「满 7 天 / 已定格 / 可拉取 / 可重拉」状态（不联网）
+            # 第五批 v4：文章管理页逐篇「是否已收敛 / 已采集 / 可拉取 / 可重拉」状态（不联网）
             try:
                 import strategy_engine
                 self._send(200, strategy_engine.detail_status())
@@ -772,18 +772,22 @@ class Handler(BaseHTTPRequestHandler):
             body = self._read_body()
             try:
                 import strategy_engine
-                # scope: missing(默认，到期未定格) / frozen(到期已定格，显式重拉) / all
-                # 三种 scope 都在 strategy_engine 内强制要求发表满 7 天。
-                # 文章量大时前端分片：先 dryRun 拿 articleIds 队列，再按 limit
-                # 分批调用；单次请求始终短，不会把 HTTP 拖到超时。
+                # v4：不再按发表天数拦截，任何有 msgid 的文章都能拉。
+                # scope: missing(默认，没采过) / frozen(已采过，显式重拉) / all。
+                # 防大批量：服务端单次请求/计划上限 + 全局互斥锁 + pause 下限；
+                # 前端先 dryRun 拿固定队列，再按 5 篇分片串行调用。
                 try:
                     limit = max(0, int(body.get("limit", 0) or 0))
                 except (TypeError, ValueError):
                     limit = 0
+                try:
+                    pause = float(body.get("pause", 1.5) or 1.5)
+                except (TypeError, ValueError):
+                    pause = 1.5
                 res = strategy_engine.fetch_detail_batch(
                     article_ids=body.get("articleIds"),
                     dry_run=bool(body.get("dryRun")),
-                    pause=float(body.get("pause", 1.5)),
+                    pause=pause,
                     scope=str(body.get("scope") or "missing"),
                     limit=limit)
                 if res.get("okCount") and not body.get("dryRun"):

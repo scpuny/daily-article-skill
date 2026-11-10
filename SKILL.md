@@ -49,13 +49,16 @@ chapters 1 → 2 → 3 (manual) or 4 (scheduled); do not start with architecture
   「一键发布到公众号」 (creates a **draft only**, never a mass-send; originality flag must
   be ticked manually in the MP backend). The user writes the article, or asks the agent
   to write one on demand — that is a one-off run, not a scheduled task.
-- **Data backfill** (optional, `/manage`): a per-article detail fetch appears only for
-  articles published **≥ 7 days ago**; the backend rejects anything younger, so pre-convergence
-  numbers never enter the feedback ledger. Already-frozen articles stay re-fetchable:
-  card「↻ 重拉」or sidebar「重拉定格」overwrites the detail/profile fields with a fresh
-  snapshot and refreshes the freeze timestamp; both require an explicit confirmation.
-  Batch buttons split into chunks of 5 with a live progress bar, a stop control and a
-  resumable queue, so a large archive never turns into one long HTTP request.
+- **Data backfill** (optional, `/manage`): **no publish-age gate** — any article with a
+  known msgid can be fetched the day it is published. A `settled` flag (< 7 days) is only
+  a tooltip hint that numbers may still grow; use「↻ 重拉」to refresh. The first successful
+  fetch marks the article as collected, so the default batch only picks up never-fetched
+  ones. Already-collected articles stay re-fetchable via card「↻ 重拉」or sidebar
+  「重拉定格」; both overwrite the detail/profile fields and require confirmation.
+  **Large archives are capped server-side**: max 10 articles per HTTP request, max 60
+  per task plan (newest first, overflow resumed on the next click), one batch at a time
+  (mutex), and ≥1s between articles. The UI splits into chunks of 5 with a live progress
+  bar, a stop control and a resumable queue in sessionStorage.
   The ledger is **one row per article**, with two coexisting sources: `read`/`share`
   from the total-table export, interaction / channel / profile fields from the
   per-article detail. The detail's own read count is kept as `detailRead` and never
