@@ -134,10 +134,24 @@ never hardcoded — swap accounts by editing `data/secrets.json` + `data/config.
   statistics API is no longer used; reach data comes from web-console exports.
 - `data/themes.json` — theme definitions (safe to ship).
 
+## Known pitfall: code-block spacing in drafts
+
+WeChat's editor trims whitespace-only `<span>`s, which used to turn `SELECT id` into
+`SELECTid` and `FROM orders` into `FROMorders`. `src/core/publish_wechat.py` now merges
+whitespace into adjacent colored tokens and emits `&nbsp;` — never output a bare-space
+span, and never pre-insert entities before `html.escape` (that produces `&amp;nbsp;`).
+
+If a user reports lost spaces: re-publish from `/manage` (the endpoint deletes the old
+draft and creates a new one); an already-broadcast article must be re-sent from the new
+draft. Verify any article with `python3 scripts/check_code_spacing.py <article.html>`
+(exit 1 = spacing regression).
+
 ## Privacy & distribution notes
 
 - The package contains **zero** real credentials, tokens, Cookies, `__biz`, article
   content, or author identity. Brand strings were generalized to "内容运营台".
 - `data/secrets.json`, `state/`, and all runtime JSON/JSONL caches are excluded and
   gitignored. A fresh install starts empty; the operator supplies their own account.
-- To re-package after changes: `python3 <skill-creator>/scripts/package_skill.py <this-dir>`.
+- To re-package after code changes: `python3 scripts/build_skill.py --src /path/to/articles`
+  — regenerates the sanitized `assets/app/` and `dist/wechat-article-studio.zip`, and
+  aborts if a privacy scan finds real credentials or article data.

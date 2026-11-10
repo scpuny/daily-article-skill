@@ -125,6 +125,7 @@ CSV / HTML 表格导入不依赖 `xlrd`。装了也不影响其他部分。
 | 取本轮写作策略 | `python3 src/app.py --mode cli strategy_engine.py get` |
 | 质检最新一篇 | `python3 src/app.py --mode cli lint --check-latest` |
 | 本地预览排版（不联网） | `python3 src/app.py --mode cli publish --html <绝对路径> --config data/config.json --dry-run --out /tmp/p.html` |
+| 检查代码块空格 | `python3 scripts/check_code_spacing.py <文章.html>` |
 | 建草稿 | `python3 src/app.py --mode cli publish --html <绝对路径> --config data/config.json --title "<标题>"` |
 | 重建画廊 | `python3 src/app.py --mode cli gallery` |
 | 看运行台账 | `python3 src/app.py --mode cli runs --list` |
@@ -419,6 +420,9 @@ A：电脑休眠、WorkBuddy 未运行、`cwds` 路径写错、任务被暂停�
 
 **Q：文章生成了但草稿箱没有？**
 A：依次查 `autoPublish`、`secrets.json`、登录态是否过期、出网 IP 是否换了（重加白名单）、lint 是否有 error 阻断。
+
+**Q：公众号里代码块的空格没了（`SELECTid`、`FROMorders`）？**
+A：旧版渲染器把空格单独包成一个 `<span>`，被微信编辑器 trim 掉了。升级到新版后，在 `/manage` 重新点「**一键发布到公众号**」即可 —— 它会自动删掉旧草稿、重建新草稿；**已经群发出去的文章不会自动变**，需要把新草稿再群发一次。想先确认排版：`python3 scripts/check_code_spacing.py <文章.html>`，会逐行比对源码块与渲染结果，少一个空格就报错。
 
 **Q：需要公网 / 域名 / 服务器吗？**
 A：不需要，服务仅监听 `127.0.0.1`。但**定时任务模式**要求到点本机开着 WorkBuddy。

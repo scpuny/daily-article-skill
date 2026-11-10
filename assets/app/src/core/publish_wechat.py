@@ -274,8 +274,39 @@ def _esc(s):
     return html.escape(s, quote=True)
 
 
+def _esc_code(s):
+    """代码文本 -> 公众号安全的 HTML。
+
+    微信正文编辑器会 trim 掉「纯空白的 span」及跨 inline 标签边界的普通空格，
+    表现为 `SELECT id` 发布后变成 `SELECTid`、`FROM orders` 变成 `FROMorders`。
+    因此这里：
+      1) 先 HTML 转义、再插入实体，避免 &nbsp; 被二次转义成 &amp;nbsp;；
+      2) 空格 / tab 一律输出 &nbsp;（不换行空格），微信不会折叠也不会 trim；
+      3) 换行转 <br>，兼容非逐行渲染的调用方。
+    """
+    t = html.escape(s, quote=True)
+    t = t.replace(" ", "&nbsp;").replace("\t", "&nbsp;" * 4)
+    return t.replace("\n", "<br>")
+
+
+def _protect_edge_spaces(t):
+    """正文段首/段尾空格紧贴 <span> 边界，微信会 trim 掉，转成 &nbsp; 保住。"""
+    if not t:
+        return t
+    if not t.strip(" "):
+        return "&nbsp;" * len(t)
+    lead = len(t) - len(t.lstrip(" "))
+    trail = len(t) - len(t.rstrip(" "))
+    mid = t[lead:len(t) - trail] if trail else t[lead:]
+    return "&nbsp;" * lead + mid + "&nbsp;" * trail
+
+
 def highlight_code(text, lang=None):
-    """整段高亮 HTML。每个 token 都包成 <span>，避免公众号渲染时吃掉词间空格。"""
+    """整段高亮 HTML。
+
+    空白不与彩色 token 拆成两个相邻 <span>：微信编辑器会吃掉「独立空白 span」
+    里的空格。这里把空白并入前一个 token，再由 _esc_code 统一转成 &nbsp;。
+    """
     spec = _LANG.get((lang or "").lower(), _UNIVERSAL)
     comments = spec.get("comment", [])
     kw = spec.get("kw", set())
@@ -283,15 +314,27 @@ def highlight_code(text, lang=None):
     template = spec.get("template", False)
     P = _PALETTE
 
-    def wrap(color, txt):
-        if not txt:
-            return ""
-        t = _esc(txt)
-        if color is None:
-            return f'<span style="color:{P["plain"]}">{t}</span>'
-        return f'<span style="color:{color}">{t}</span>'
+    toks = []          # [color, 纯文本]
+    pending = ""       # 待并入下一个 token 的空白
 
-    out = []
+    def push(color, txt, glue=False):
+        """glue=True 表示空白：先攒着，并入下一个/上一个彩色 token，
+        保证输出里不存在「纯空白 span」（微信会把它整段 trim 掉）。"""
+        nonlocal pending
+        if not txt:
+            return
+        if glue:
+            pending += txt
+            return
+        if pending:
+            txt = pending + txt
+            pending = ""
+        color = color or P["plain"]
+        if toks and toks[-1][0] == color:
+            toks[-1][1] += txt
+        else:
+            toks.append([color, txt])
+
     i, n = 0, len(text)
     while i < n:
         c = text[i]
@@ -311,13 +354,13 @@ def highlight_code(text, lang=None):
                 end = j if j >= 0 else n
             if end <= i:  # 兜底：任何情况下都推进指针，避免死循环
                 end = i + 1
-            out.append(wrap(P["comment"], text[i:end]))
+            push(P["comment"], text[i:end])
             i = end
             continue
         # 字符串 / 模板串
         if c in "\"'`":
             if c == "`" and not template:
-                out.append(wrap(None, c)); i += 1; continue
+                push(None, c); i += 1; continue
             q = c
             j = i + 1
             while j < n:
@@ -328,7 +371,7 @@ def highlight_code(text, lang=None):
                     j += 1
                     break
                 j += 1
-            out.append(wrap(P["string"], text[i:j]))
+            push(P["string"], text[i:j])
             i = j
             continue
         # 数字
@@ -337,7 +380,7 @@ def highlight_code(text, lang=None):
             while j < n and (text[j].isdigit() or text[j] in "._" or
                              (j == i + 1 and text[i] == "0" and text[j] in "xXoObB")):
                 j += 1
-            out.append(wrap(P["number"], text[i:j]))
+            push(P["number"], text[i:j])
             i = j
             continue
         # 标识符 / 单词
@@ -347,28 +390,34 @@ def highlight_code(text, lang=None):
                 j += 1
             word = text[i:j]
             if word in kw:
-                out.append(wrap(P["keyword"], word))
+                push(P["keyword"], word)
             elif word in type_kw:
-                out.append(wrap(P["type"], word))
+                push(P["type"], word)
             elif word and word[0].isupper() and word not in ("Self",):
-                out.append(wrap(P["type"], word))
+                push(P["type"], word)
             elif text[j:j + 1] == "(":
-                out.append(wrap(P["func"], word))
+                push(P["func"], word)
             else:
-                out.append(wrap(None, word))
+                push(None, word)
             i = j
             continue
-        # 空白（含换行）：一律包 plain span，空格属于某个 span 内部，公众号不会丢
+        # 空白（含换行）：不单独成 span，粘到相邻 token；最终由 _esc_code 转 &nbsp;
         if c in " \t\n":
             j = i
             while j < n and text[j] in " \t\n":
                 j += 1
-            out.append(wrap(None, text[i:j]))
+            push(None, text[i:j], glue=True)
             i = j
             continue
-        out.append(wrap(None, c))
+        push(None, c)
         i += 1
-    return "".join(out)
+    if pending:  # 行尾空白
+        if toks:
+            toks[-1][1] += pending
+        else:
+            toks.append([P["plain"], pending])
+    return "".join(f'<span style="color:{col}">{_esc_code(txt)}</span>'
+                   for col, txt in toks)
 
 
 FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif"
@@ -540,9 +589,11 @@ def inline_html(segs):
         t = esc(text)
         if kind == "s" and t.strip():
             out.append(f'<span style="background:{STRONG_BG};color:{STRONG_FG};'
-                       f'padding:0 4px;border-radius:4px;font-weight:600">{t}</span>')
+                       f'padding:0 4px;border-radius:4px;font-weight:600">'
+                       f'{_protect_edge_spaces(t)}</span>')
         else:
-            out.append(t)
+            # 紧贴标签边界的空格微信会 trim，转成 &nbsp; 保住
+            out.append(_protect_edge_spaces(t))
     return "".join(out)
 
 
@@ -628,29 +679,23 @@ def render(blocks, img_map):
                 )
         elif t == "code":
             lang = b.get("lang")
-            lines = (b.get("text", "") or "").split("\n")
+            lines = (b.get("text", "") or "").rstrip("\n").split("\n")
             line_divs = []
             for raw in lines:
-                m = re.match(r"^[ \t]+", raw)
-                indent = ""
-                body = raw
-                if m:
-                    # 行首缩进转 &nbsp;（保留缩进、不参与换行）
-                    indent = "".join("&nbsp;" if ch == " " else "&nbsp;&nbsp;&nbsp;&nbsp;"
-                                     for ch in m.group())
-                    body = raw[m.end():]
-                # 行内连续 2+ 空格转 &nbsp; 以保留对齐；单个空格保持普通（可作换行点）
-                body = re.sub(r" {2,}", lambda x: "&nbsp;" * len(x.group()), body)
-                hl = highlight_code(body, lang)
+                # 整行原文交给高亮器：缩进、词间空格、行尾空格统一在 _esc_code 里
+                # 转成 &nbsp;；不再预先插入实体（会被 html.escape 二次转义成 &amp;nbsp;）
+                hl = highlight_code(raw, lang) or "&nbsp;"
                 line_divs.append(
                     f'<div style="font-family:{MONO};font-size:13px;'
-                    f'line-height:1.55;color:{CODE_FG}">{indent}{hl}</div>'
+                    f'line-height:1.55;color:{CODE_FG};'
+                    f'white-space:pre-wrap;word-break:break-all;">{hl}</div>'
                 )
             inner = "".join(line_divs)
             out.append(
                 f'<section style="background:{CODE_BG};padding:14px 16px;'
                 f'margin:20px 0;border-radius:6px;'
-                f'font-family:{MONO};overflow-wrap:break-word;">{inner}</section>'
+                f'font-family:{MONO};overflow-wrap:break-word;'
+                f'word-break:break-all;">{inner}</section>'
             )
         elif t == "quote":
             out.append(

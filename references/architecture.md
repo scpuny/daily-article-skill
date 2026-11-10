@@ -31,6 +31,24 @@
 - `theme_manager.py`：主题 token 体系（22 个），内置 + 自定义，`/settings` 可改。
 - `build_gallery.py`：导出静态文章画廊 HTML。
 
+## 公众号代码块空白策略（易踩坑）
+
+微信正文编辑器保存草稿时会 trim 掉「独立的空白 `<span>`」。早期版本把词间空格包成
+`<span> </span>`，发布后 `SELECT id` 变成 `SELECTid`、`FROM orders` 变成 `FROMorders`。
+`publish_wechat.py` 现按三条规则渲染：
+
+1. `highlight_code()` 把空白攒进 `pending`，并入相邻彩色 token，**绝不产生纯空白 span**；
+2. `_esc_code()` 先 HTML 转义再插入实体，空格 / tab 一律输出 `&nbsp;`，不会被折叠，
+   也不会被二次转义成字面文本 `&amp;nbsp;`；
+3. 代码行 `<div>` 带 `white-space:pre-wrap;word-break:break-all` 作双保险，长行仍可断行。
+
+正文 `inline_html()` 只把段首 / 段尾（紧贴标签边界）的空格转 `&nbsp;`，段中空格保持普通，
+避免整段变成不可换行的一长串。
+
+回归防线：`python3 scripts/check_code_spacing.py <文章.html>`（可再传一个参数指定已生成的
+公众号版 HTML）。它把源 `<pre>` 与渲染产物逐行还原成纯文本比对，并静态检查 `&amp;nbsp;`
+与纯空白 span；任何一行缺空格即 exit 1。改渲染器后建议对 `data/content/` 全量跑一遍。
+
 ## 关键数据流
 
 1. **登录**：扫码 → `mp_session` 写 `state/mp_session.json` → 后续下载/发布复用同一份 token+Cookie。
