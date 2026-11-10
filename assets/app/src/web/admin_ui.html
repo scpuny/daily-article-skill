@@ -425,6 +425,18 @@
   .wall-kv i{font-style:normal;font-size:10px;color:#bcd2f2;border:1px solid rgba(64,158,255,.26);
     background:rgba(6,13,28,.6);border-radius:999px;padding:3px 9px;white-space:nowrap}
   .wall-kv i b{color:var(--cyan);font-weight:800;font-variant-numeric:tabular-nums}
+  .wall-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .wall-acts .tbtn{padding:3px 9px;font-size:11px}
+  .wall-acts select{color:var(--cyan);background:rgba(6,13,28,.7);border:1px solid var(--border);
+    border-radius:8px;padding:3px 8px;font-size:11px;font-family:inherit;cursor:pointer}
+  .wall-acts select option{background:#0a1830;color:#cfe4ff}
+  .wall-steps{flex:0 0 auto;padding:0 16px;display:flex;align-items:center;gap:12px}
+  .wall-steps .stepbar{flex:1;min-width:0;margin:0}
+  .wall-steps .stepbar .dot{width:19px;height:19px}
+  .wall-steps .stepbar .sp::before{top:9px}
+  .wall-steps .stepbar .lb{font-size:10.5px}
+  /* 五个视图统一图表墙；只有「内容生产」保留底部文章矩阵 */
+  .dash.no-matrix .matrix{display:none}
   .wall-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
     grid-template-rows:repeat(2,minmax(0,1fr));gap:10px}
   .wcard{position:relative;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;
@@ -463,6 +475,8 @@
   .a-grow.go{transform:scale(1)}
   .a-ring{stroke-dashoffset:var(--len);transition:stroke-dashoffset 1.15s cubic-bezier(.2,.8,.2,1)}
   .a-ring.go{stroke-dashoffset:0}
+  .a-gauge{stroke-dashoffset:var(--len);transition:stroke-dashoffset 1.15s cubic-bezier(.2,.8,.2,1)}
+  .a-gauge.go{stroke-dashoffset:var(--to)}
   .a-w{transform-box:fill-box;transform-origin:left;transform:scaleX(0);
     transition:transform .85s cubic-bezier(.2,.85,.25,1)}
   .a-w.go{transform:scaleX(1)}
@@ -1056,50 +1070,14 @@ function renderKPIs(){
     <div class="spark ${d.dim?'dim':''}">${d.spark||""}</div>${d.seq?sparkline(d.seq,d.c,d.lab):""}</div>`).join("");
 }
 
-// ---------- 中间三栏 ----------
+// ---------- 中间区域：五个视图统一图表墙 ----------
+/* 旧版三栏在 520px 固定行高里塞文字/表格，长内容被裁切、底部文章矩阵又占一大块，
+   视觉上就是「变形」。现在所有视图都走同一套图表墙（4×2 / 窄屏 3×3），
+   底部文章矩阵只在「内容生产」保留；每个视图顶部保留一行 STEP 步骤说明。*/
 function renderMid(){
-  document.querySelector(".dash").classList.toggle("st-view",view==="strategy");
-  $("stage").classList.toggle("wall-on",view==="local");
-  ["midB1","midB2","midB3"].forEach(id=>$(id).className="body");
-  if(view==="local"){renderWall();return;}
-  if(view==="strategy"){
-    const s=strategy||{};
-    $("midT1").innerHTML="策略状态"+badge(`${fmt(s.sampleSize||0)} 篇配对`);
-    $("midT2").innerHTML="本轮写作硬约束"+badge(`${(s.constraints||[]).length} 条`);
-    $("midT3").innerHTML="句式权重与信号"+badge({cold:"冷启动",warm:"积累中",strong:"可信"}[s.confidence||"cold"]);
-    ["midB1","midB2","midB3"].forEach(id=>$(id).className="body st-body");
-    renderStrategy();
-    return;
-  }
-  if(view==="evolve"){
-    const h=(strategy||{}).history||[];
-    const eff=(strategy||{}).effectiveness||{versions:[]};
-    const downs=(eff.versions||[]).filter(v=>v.status==="down").length;
-    $("midT1").innerHTML="策略版本时间线"+badge(`${fmt(h.length)} 版`);
-    $("midT2").innerHTML="样本黏性榜 · 有效性追踪"+badge(`${downs} 降级`);
-    $("midT3").innerHTML="假设验证闭环"+badge(`${fmt((strategy||{}).hypotheses||[]).length} 假设`);
-    ["midB1","midB2","midB3"].forEach(id=>$(id).className="body st-body");
-    renderEvolve();
-    return;
-  }
-  if(view==="attr"){
-    const a=(strategy||{}).attribution||{matrix:[],summary:{}};
-    const s=a.summary||{};
-    $("midT1").innerHTML="归因指标"+badge(`指令 ${fmt((a.matrix||[]).length)} 条`);
-    $("midT2").innerHTML="约束归因矩阵"+`<span class="h2-badge">${icon("check")}${fmt(s.significantPos||0)} ${icon("x")}${fmt(s.significantNeg||0)}</span>`;
-    $("midT3").innerHTML="命中 / 控制下钻"+badge(`${fmt((a.matrix||[]).length)} 行可下钻`);
-    ["midB1","midB2","midB3"].forEach(id=>$(id).className="body st-body");
-    renderAttr();
-    return;
-  }
-  {
-    const dd=(stats&&stats.daily)||[],R=(stats&&stats.remoteSummary)||null;
-    $("midT1").innerHTML="数据接入指标"+badge(`${dd.length} 天日粒度`);
-    $("midT2").innerHTML="近 7 日阅读趋势"+badge(dd.length?`合计 ${fmt(sumBy(dd,d=>d.read))} 阅读`:"暂无快照");
-    $("midT3").innerHTML="文章表现 TOP"+badge(R?`${fmt(R.articleCount||0)} 条明细`:"暂无明细");
-    $("midB1").style.alignItems="stretch";$("midB2").style.alignItems="stretch";$("midB3").style.alignItems="stretch";
-    renderGuide();renderReachTrend();renderTop();
-  }
+  document.querySelector(".dash").classList.toggle("no-matrix",view!=="local");
+  $("stage").classList.add("wall-on");
+  renderWall();          // 按 view 分派图表配置
 }
 
 // ---------- 写作策略视图（只读） ----------
@@ -1418,6 +1396,8 @@ async function writeSkillRules(){
 
 // ---------- 归因矩阵视图（R1） ----------
 function attrSelect(i){attrSelected=i;renderAttr();}
+/* 图表墙版下钻：不再渲染隐藏的三栏，直接重绘当前视图的图表墙 */
+function attrPick(i){attrSelected=i;renderWall();}
 function renderAttr(){
   const M=derive();
   const a=(strategy||{}).attribution||{matrix:[],summary:{}};
@@ -1517,6 +1497,197 @@ const wGrid=(pl,pr,pt,pb,rows,fmtY)=>{
   }
   return s;
 };
+
+/* ===== 通用图元：其余四个视图共用。全部真实数据、纯内联 SVG，无外部库 =====
+   与 w* 系列共用 320×140 viewBox、.a-* 入场动画、统一渐变 id 生成器（避免多卡串色）。*/
+let _gUid=0;
+const GPAL=["#46e6ff","#2f80ed","#a97bff","#27e0a0","#ffb547","#ff6b6b","#00d4ff","#8fa8c8"];
+const gId=()=>"gx"+(++_gUid);
+const gClip=(s,n)=>{const t=String(s==null?"—":s);return t.length>n?t.slice(0,n-1)+"…":t;};
+const gMax=vals=>Math.max(1,...vals.map(v=>Number(v)||0));
+const gEmpty=t=>wSVG(`<text x="160" y="72" text-anchor="middle" fill="#6f86ab" font-size="12">${esc(t)}</text>`);
+
+/* 面积折线：第一条为主序列（渐变面积 + 描边），其余为对比虚线 */
+function gLine(series,o={}){
+  const ss=(series||[]).filter(s=>s&&(s.vals||[]).length);
+  if(!ss.length)return gEmpty("暂无趋势数据");
+  const n=Math.max(...ss.map(s=>s.vals.length)),
+        max=Math.max(1,...ss.flatMap(s=>s.vals.map(v=>Number(v)||0)))*1.1,
+        pl=34,pr=12,pt=12,pb=22,id=gId();
+  const X=i=>pl+(320-pl-pr)*i/Math.max(1,n-1),Y=v=>140-pb-(140-pt-pb)*(Number(v)||0)/max;
+  const path=vals=>vals.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
+  const first=ss[0].vals,area=`${path(first)} L${X(first.length-1).toFixed(1)} ${140-pb} L${pl} ${140-pb} Z`;
+  const lines=ss.map((s,k)=>k
+    ?`<path class="a-fade" d="${path(s.vals)}" fill="none" stroke="${s.color||"#a97bff"}" stroke-width="1.7" stroke-dasharray="5 4" opacity=".85"/>`
+    :`<path class="a-draw" style="--len:900" d="${path(s.vals)}" fill="none" stroke="url(#${id}L)" stroke-width="2.4" stroke-linecap="round"/>`).join("");
+  const dots=first.map((v,i)=>`<circle class="a-fade" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="1.6" fill="#9ceaff"/>`).join("");
+  const mean=o.mean!=null?`<line x1="${pl}" y1="${Y(o.mean).toFixed(1)}" x2="${320-pr}" y2="${Y(o.mean).toFixed(1)}" stroke="#27e0a0" stroke-width="1" stroke-dasharray="4 4" opacity=".8"/>
+    <text x="${320-pr}" y="${(Y(o.mean)-3).toFixed(1)}" text-anchor="end" fill="#27e0a0" font-size="9.5">均 ${fmt(Math.round(o.mean))}</text>`:"";
+  const labs=o.labels||[],dates=labs.length?`<text x="${pl}" y="135" fill="#6f86ab" font-size="9.5">${esc(String(labs[0]).slice(5))}</text>
+    <text x="${320-pr}" y="135" text-anchor="end" fill="#6f86ab" font-size="9.5">${esc(String(labs[labs.length-1]).slice(5))}</text>`:"";
+  return wSVG(`<defs><linearGradient id="${id}A" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="rgba(0,212,255,.42)"/><stop offset="1" stop-color="rgba(0,212,255,0)"/></linearGradient>
+    <linearGradient id="${id}L" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2f80ed"/><stop offset="1" stop-color="#46e6ff"/></linearGradient></defs>
+    ${wGrid(pl,pr,pt,pb,3,k=>o.fmtY?o.fmtY(max*k/3):Math.round(max*k/3))}
+    <path class="a-fade" d="${area}" fill="url(#${id}A)"/>${lines}${dots}${mean}${dates}`);
+}
+
+/* 竖柱：峰值金柱 + 0 值灰柱，标签按密度抽样 */
+function gBars(items,o={}){
+  if(!items||!items.length)return gEmpty("暂无数据");
+  const vals=items.map(x=>Number(x.value)||0),max=o.max||gMax(vals)*1.14,
+        pl=32,pr=10,pt=12,pb=24,id=gId(),cw=(320-pl-pr)/items.length,pk=Math.max(0,...vals),
+        firstPk=vals.indexOf(pk);
+  let bars="",labels="";
+  items.forEach((it,i)=>{
+    const v=vals[i],bh=(140-pt-pb)*v/max,x=pl+cw*i+cw*.18,bw=cw*.64,y=140-pb-bh,
+          hot=v>0&&v===pk&&i===firstPk&&o.hot!==false&&o.showPeak!==false;
+    bars+=`<g title="${esc(it.tip||it.label||"")} · ${fmt(v)}"><rect class="a-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}"
+      width="${bw.toFixed(1)}" height="${Math.max(bh,1).toFixed(1)}" rx="2"
+      fill="${it.color||(hot?`url(#${id}H)`:`url(#${id}B)`)}"/>
+      ${hot&&o.showPeak!==false?`<text class="a-fade" x="${(x+bw/2).toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="middle" fill="#ffb547" font-size="10.5">${fmt(v)}</text>`:""}</g>`;
+    if(i%Math.max(1,Math.ceil(items.length/6))===0||i===items.length-1)
+      labels+=`<text x="${(x+bw/2).toFixed(1)}" y="135" text-anchor="middle" fill="#6f86ab" font-size="9">${esc(gClip(it.label||"",6))}</text>`;
+  });
+  return wSVG(`<defs><linearGradient id="${id}B" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#46e6ff"/><stop offset="1" stop-color="#2f80ed"/></linearGradient>
+    <linearGradient id="${id}H" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd479"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient></defs>
+    ${wGrid(pl,pr,pt,pb,3,k=>o.fmtY?o.fmtY(max*k/3):Math.round(max*k/3))}${bars}${labels}`);
+}
+
+/* 横向条：长标签截断 + title 可悬停看全文 */
+function gHBars(items,o={}){
+  const list=(items||[]).slice(0,8);
+  if(!list.length)return gEmpty("暂无数据");
+  const max=gMax(list.map(x=>x.value)),left=o.left||92,barW=320-left-42,top=5,id=gId(),
+        rh=(140-top*2)/list.length;
+  return wSVG(`<defs><linearGradient id="${id}B" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2f80ed"/><stop offset="1" stop-color="#46e6ff"/></linearGradient></defs>`+
+    list.map((it,i)=>{
+      const v=Number(it.value)||0,w=Math.max(2,barW*v/max),y=top+rh*i;
+      return `<text x="${left-5}" y="${(y+rh/2+3).toFixed(1)}" text-anchor="end" fill="#a8c2e8" font-size="9.5"
+        title="${esc(String(it.label||""))}">${esc(gClip(it.label,o.clip||11))}</text>
+        <rect x="${left}" y="${(y+rh*.18).toFixed(1)}" width="${barW}" height="${(rh*.62).toFixed(1)}" rx="3" fill="rgba(255,255,255,.06)"/>
+        <rect class="a-w" x="${left}" y="${(y+rh*.18).toFixed(1)}" width="${w.toFixed(1)}" height="${(rh*.62).toFixed(1)}" rx="3" fill="${it.color||`url(#${id}B)`}"/>
+        <text class="a-fade" x="316" y="${(y+rh/2+3).toFixed(1)}" text-anchor="end" fill="#46e6ff" font-size="10" font-weight="700">${esc(o.fmt?String(o.fmt(v)):fmt(+v.toFixed(2)))}</text>`;
+    }).join(""));
+}
+
+/* 环形分段：中心总数 + 右侧图例 */
+function gRing(items,o={}){
+  const vals=(items||[]).map(x=>Number(x.value)||0),total=vals.reduce((a,b)=>a+b,0);
+  if(!total)return gEmpty("暂无样本");
+  const cx=82,cy=70,r=48,C=2*Math.PI*r;let off=0,segs="";
+  items.forEach((it,i)=>{
+    const len=C*vals[i]/total;
+    if(len<=0)return;
+    segs+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${it.color||GPAL[i%GPAL.length]}"
+      stroke-width="15" stroke-dasharray="${len.toFixed(1)} ${(C-len).toFixed(1)}"
+      stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    off+=len;
+  });
+  const legend=items.slice(0,5).map((it,i)=>`<g><circle cx="158" cy="${(28+i*22).toFixed(1)}" r="4" fill="${it.color||GPAL[i%GPAL.length]}"/>
+    <text x="168" y="${(32+i*22).toFixed(1)}" fill="#cfe4ff" font-size="10" title="${esc(String(it.label||""))}">${esc(gClip(it.label,9))}</text>
+    <text x="312" y="${(32+i*22).toFixed(1)}" text-anchor="end" fill="#46e6ff" font-size="10.5" font-weight="700">${fmt(vals[i])}</text></g>`).join("");
+  return wSVG(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="15"/>
+    <g class="a-grow">${segs}</g>
+    <text x="${cx}" y="${cy-2}" text-anchor="middle" fill="#fff" font-size="22" font-weight="800">${esc(o.center||fmt(total))}</text>
+    <text x="${cx}" y="${cy+15}" text-anchor="middle" fill="#7f93b8" font-size="10">${esc(o.sub||"合计")}</text>${legend}`);
+}
+
+/* 漏斗：层宽按真实数值，逐层收窄 */
+function gFunnel(steps,o={}){
+  const list=(steps||[]).slice(0,5);
+  if(!list.length)return gEmpty("暂无链路数据");
+  const max=gMax(list.map(x=>x.value)),h=(140-16)/list.length;
+  return wSVG(list.map((s,i)=>{
+    const v=Number(s.value)||0,next=Number((list[i+1]||{}).value),
+          w=Math.max(56,236*v/max),w2=Math.max(48,236*(Number.isFinite(next)?next:v*.82)/max),y=8+i*h;
+    return `<polygon class="a-fade" points="${(160-w/2).toFixed(1)},${y.toFixed(1)} ${(160+w/2).toFixed(1)},${y.toFixed(1)}
+      ${(160+w2/2).toFixed(1)},${(y+h-5).toFixed(1)} ${(160-w2/2).toFixed(1)},${(y+h-5).toFixed(1)}"
+      fill="${GPAL[i%GPAL.length]}" opacity="${(0.85-i*.09).toFixed(2)}" stroke="rgba(255,255,255,.12)"/>
+      <text x="160" y="${(y+h/2-1).toFixed(1)}" text-anchor="middle" fill="#04122b" font-size="11" font-weight="800">${esc(gClip(s.label,10))} ${fmt(v)}</text>`;
+  }).join(""));
+}
+
+/* 散点 + 线性拟合 + 相关系数 */
+function gScatter(points,o={}){
+  const ps=(points||[]).filter(p=>Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y)))
+    .map(p=>({x:Number(p.x),y:Number(p.y),label:p.label||""}));
+  if(!ps.length)return gEmpty("暂无散点样本");
+  const xs=ps.map(p=>p.x),ys=ps.map(p=>p.y),xmax=gMax(xs),ymax=gMax(ys),
+        pl=34,pr=12,pt=12,pb=22,
+        X=v=>pl+(320-pl-pr)*v/xmax,Y=v=>140-pb-(140-pt-pb)*v/ymax;
+  const dots=ps.map(p=>`<circle class="a-fade" cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3.2" fill="#46e6ff" opacity=".82"
+    title="${esc(p.label)} · ${fmt(p.x)} / ${fmt(p.y)}"/>`).join("");
+  const r=corr(xs,ys),mx=xs.reduce((a,b)=>a+b,0)/xs.length,my=ys.reduce((a,b)=>a+b,0)/ys.length;
+  let vx=0;ps.forEach(p=>{vx+=(p.x-mx)*(p.x-mx);});
+  const reg=vx>0?(p=>{const b=ps.reduce((a,q)=>a+(q.x-mx)*(q.y-my),0)/vx,aa=my-b*mx;
+    return `<line class="a-fade" x1="${X(0).toFixed(1)}" y1="${Y(aa).toFixed(1)}" x2="${X(xmax).toFixed(1)}" y2="${Y(aa+b*xmax).toFixed(1)}" stroke="#ffb547" stroke-width="1.6" stroke-dasharray="5 4"/>`;})():"";
+  return wSVG(`${wGrid(pl,pr,pt,pb,3,k=>Math.round(ymax*k/3))}${reg}${dots}
+    <text x="${320-pr}" y="${pt+10}" text-anchor="end" fill="${r==null?"#7f93b8":"#27e0a0"}" font-size="11" font-weight="700">r = ${r==null?"—":r}</text>
+    <text x="${pl}" y="135" fill="#6f86ab" font-size="9">${esc(o.xLabel||"X")}</text>
+    <text x="${320-pr}" y="135" text-anchor="end" fill="#6f86ab" font-size="9">${esc(o.yLabel||"Y")}</text>`);
+}
+
+/* 半环仪表：0~100 归一 */
+function gGauge(v,o={}){
+  const p=Math.max(0,Math.min(100,Number(v)||0)),cx=160,cy=112,r=80,C=Math.PI*r,id=gId(),to=C*(1-p/100);
+  return wSVG(`<defs><linearGradient id="${id}G" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2f80ed"/><stop offset=".6" stop-color="#46e6ff"/><stop offset="1" stop-color="#27e0a0"/></linearGradient></defs>
+    <path d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="17" stroke-linecap="round"/>
+    <path class="a-gauge" style="--len:${C.toFixed(1)};--to:${to.toFixed(1)}"
+      d="M ${cx-r} ${cy} A ${r} ${r} 0 0 1 ${cx+r} ${cy}" fill="none" stroke="url(#${id}G)"
+      stroke-width="17" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)} ${C.toFixed(1)}"/>
+    <text x="${cx}" y="${cy-16}" text-anchor="middle" fill="#fff" font-size="30" font-weight="800">${p.toFixed(0)}<tspan font-size="14" fill="#46e6ff">%</tspan></text>
+    <text x="${cx}" y="${cy+3}" text-anchor="middle" fill="#7f93b8" font-size="10.5">${esc(o.label||"")}</text>
+    <text x="${cx-r}" y="${cy+18}" fill="#6f86ab" font-size="9">0</text>
+    <text x="${cx+r}" y="${cy+18}" text-anchor="end" fill="#6f86ab" font-size="9">100</text>`);
+}
+
+/* 日粒度热力：5 列，色深=当日值 */
+function gHeatDays(days,key,o={}){
+  const vals=(days||[]).map(d=>Number(d[key])||0);
+  if(!vals.length)return gEmpty("暂无日粒度");
+  const max=gMax(vals),cols=5,cw=57,ch=38,gx=4,gy=4;
+  return wSVG(days.map((d,i)=>{
+    const v=vals[i],x=8+(i%cols)*(cw+gx),y=8+Math.floor(i/cols)*(ch+gy),a=.1+.75*v/max;
+    return `<g title="${esc(d.date||"")} · ${fmt(v)}"><rect class="a-fade" x="${x}" y="${y}" width="${cw}" height="${ch}" rx="5"
+      fill="rgba(0,212,255,${a.toFixed(2)})" stroke="rgba(64,158,255,.25)"/>
+      <text x="${x+5}" y="${y+14}" fill="#8fa8c8" font-size="9">${esc(String(d.date||"").slice(5))}</text>
+      <text x="${x+5}" y="${y+29}" fill="#eaf4ff" font-size="12" font-weight="700">${fmt(v)}</text></g>`;
+  }).join(""));
+}
+
+/* 结构堆叠条 + 图例 */
+function gStack(items,o={}){
+  const vals=(items||[]).map(x=>Number(x.value)||0),total=vals.reduce((a,b)=>a+b,0);
+  if(!total)return gEmpty("暂无结构数据");
+  let x=12,segs="";
+  items.forEach((it,i)=>{
+    const w=296*vals[i]/total;
+    segs+=`<rect class="a-fade" x="${x.toFixed(1)}" y="34" width="${Math.max(w,0).toFixed(1)}" height="30" rx="3" fill="${it.color||GPAL[i%GPAL.length]}" opacity=".88"/>`;
+    if(w>34)segs+=`<text class="a-fade" x="${(x+w/2).toFixed(1)}" y="53" text-anchor="middle" fill="#04122b" font-size="10" font-weight="800">${((vals[i]/total)*100).toFixed(0)}%</text>`;
+    x+=w;
+  });
+  const legend=items.slice(0,6).map((it,i)=>`<g><circle cx="${16+(i%3)*100}" cy="${88+Math.floor(i/3)*22}" r="4" fill="${it.color||GPAL[i%GPAL.length]}"/>
+    <text x="${24+(i%3)*100}" y="${92+Math.floor(i/3)*22}" fill="#cfe4ff" font-size="9.5" title="${esc(String(it.label||""))}">${esc(gClip(it.label,7))}</text>
+    <text x="${104+(i%3)*100}" y="${92+Math.floor(i/3)*22}" text-anchor="end" fill="#46e6ff" font-size="9.5">${fmt(vals[i])}</text></g>`).join("");
+  return wSVG(segs+legend);
+}
+
+/* 第 09 卡（窄屏补位）：数据链路健康，用 HTML 条形 */
+function gHealth(dh){
+  const c=(dh&&dh.counts)||{};
+  const rows=[["文章台账",c.articles],["特征台账",c.features],["反馈行",c.feedback],
+    ["快照明细",c.cacheArticles],["策略样本",c.samples],["版本历史",c.history]];
+  const max=gMax(rows.map(r=>r[1]));
+  return `<div class="hbars">${rows.map(([k,v])=>`<div class="hbar">
+    <span class="hn">${esc(k)}</span><span class="ht"><i data-w="${(100*(Number(v)||0)/max).toFixed(1)}"></i></span>
+    <span class="hv">${fmt(v||0)}</span></div>`).join("")}</div>`;
+}
 
 /* 01 累计字数：面积 + 描边 + 末点脉冲 */
 function wCumulative(tl){
@@ -1727,36 +1898,195 @@ function wMomentum(tl){
     <span>右侧为环比</span></div></div>`;
 }
 
-function renderWall(){
-  const L=(stats&&stats.local)||{},tl=L.timeline||[],arts=L.articles||[];
-  const tP=sumBy(tl,d=>d.count),tW=sumBy(tl,d=>d.words),act=tl.filter(d=>d.count>0).length;
-  const pk=peakOf(tl,d=>d.count);
-  const kv=[["合计",`${fmt(tP)} 篇`],["字数",fmt(tW)],["日均",`${(tP/Math.max(tl.length,1)).toFixed(1)} 篇`],
-    ["有产出",`${act} 天`],["峰值",`${String(pk.date||"—").slice(5)} ${fmt(pk.count||0)} 篇`]];
-  const cards=[
-    ["01","累计字数增长",fmt(tW)+" 字",wCumulative(tl),"近 14 日累计 · 斜率即当日产能"],
-    ["02","每日产出字数","峰 "+fmt(Math.max(0,...tl.map(d=>Number(d.words)||0)))+" 字",wDaily(tl),"柱高为当日字数 · 金柱为峰值 · 绿线为日均"],
-    ["03","资产完成度",`${L.total||0} 篇`,wRings(L,arts),"四层同心环 · 由外到内：字数/代码/封面/草稿"],
-    ["04","内容结构雷达","近 14 日",wRadar(L,arts,tl),"五维归一 · 青=近 14 日，紫=全期均值"],
-    ["05","四支柱分布",`${(L.pillars||[]).length} 类`,wRose(L),"扇区半径按篇数 · 中心为总篇数"],
-    ["06","标签热度 TOP6",`${(L.tags||[]).length} 个`,wTags(L),"标签在文章中的出现篇数"],
-    ["07","14 日产出热力",`${act}/14 天`,wHeat(tl,L),"色深=当日字数 · 悬停看当天文章"],
-    ["08","篇幅分布",`${L.avgWords||0} 字/篇`,wHist(arts),"按 200 字分桶 · 绿线为均值"],
-    ["09","7 日动能对比","环比",wMomentum(tl),"灰=前 7 日，青=近 7 日 · 右侧为环比"],
-  ];
+/* 统一绘制：标题栏 + 一行 STEP 步骤说明 + 图表墙（宽屏 4×2 / 窄屏 3×3） */
+function paintWall(spec){
   $("wall").innerHTML=`<div class="wall-head">
-      <div class="wt">内容生产 · 实时图谱</div>
-      <div class="wsub">8 组指标 / 数据源：本地台账 + 文章矩阵</div>
-      <div class="wall-kv">${kv.map(x=>`<i>${x[0]} <b>${x[1]}</b></i>`).join("")}</div>
-    </div><div class="wall-grid">`+
-    cards.map(c=>`<div class="wcard"><div class="ch"><span class="no">${c[0]}</span>
+      <div class="wt">${esc(spec.title)}</div>
+      <div class="wsub">${esc(spec.sub||"")}</div>
+      <div class="wall-kv">${(spec.kv||[]).map(x=>`<i>${esc(x[0])} <b>${esc(x[1])}</b></i>`).join("")}</div>
+    </div><div class="wall-steps">${stepBar(spec.steps||[])}
+      ${spec.acts?`<div class="wall-acts">${spec.acts}</div>`:""}</div><div class="wall-grid">`+
+    spec.cards.map(c=>`<div class="wcard"><div class="ch"><span class="no">${c[0]}</span>
       <span class="ct">${c[1]}</span><span class="cv">${c[2]}</span></div>
       <div class="cs">${c[3]}</div><div class="cf">${c[4]}</div></div>`).join("")+`</div>`;
   requestAnimationFrame(()=>{
-    document.querySelectorAll("#wall .a-bar,#wall .a-draw,#wall .a-fade,#wall .a-grow,#wall .a-ring,#wall .a-w")
+    document.querySelectorAll("#wall .a-bar,#wall .a-draw,#wall .a-fade,#wall .a-grow,#wall .a-ring,#wall .a-w,#wall .a-gauge")
       .forEach(e=>e.classList.add("go"));
     document.querySelectorAll("#wall .hbar i,#wall .mb i").forEach(e=>e.style.width=e.dataset.w+"%");
   });
+}
+
+/* 其余四个视图的图表墙配置：全部由 /api/* 真实数据现算，不编造序列 */
+function wallSpec(v){
+  const S=stats||{},R=S.remoteSummary||{},dd=S.daily||[],sarts=S.articles||[],P=S.profile||{},
+        st=strategy||{},own=st.own||{},ext=st.external||{},pr=st.pairing||{},hyps=st.hypotheses||[],
+        hist=(st.history||[]).slice().reverse(),samples=strategySamples||[],
+        am=(st.attribution||{}).matrix||[],asum=(st.attribution||{}).summary||{},
+        eff=st.effectiveness||{},dh=dataHealth||{},M=derive();
+  const C=(no,t,val,chart,foot)=>[no,t,val,chart,foot];
+  const wObj=m=>Object.entries(m||{}).map(([k,x],i)=>({label:k,value:Number(x)||0,color:GPAL[i%GPAL.length]}));
+  const hCard=C("09","数据链路健康",`${fmt((dh.counts||{}).articles||0)} 篇`,gHealth(dh),"各台账条数 · 条形长度为相对值");
+  const vlab=h=>String(h.version||"").slice(4,6)+"-"+String(h.version||"").slice(6,8);
+  const real=samples.filter(s=>!/^backfill/i.test(String(s.strategyVersion||""))).length;
+  const srcRing=()=>gRing([{label:"真实实验",value:real,color:"#27e0a0"},
+    {label:"历史回填",value:samples.length-real,color:"#8fa8c8"}],{center:fmt(samples.length),sub:"样本"});
+
+  if(v==="reach"){
+    const read=dd.map(d=>Number(d.read)||0),
+          inter=dd.map(d=>(Number(d.share)||0)+(Number(d.fav)||0)+(Number(d.like)||0)),
+          ch=Object.entries(P.channels||{}).map(([k,x],i)=>({label:k,value:Number(x)||0,color:GPAL[i%GPAL.length]})),
+          top=((R.top||[]).length?R.top:sarts).slice(0,8).map(a=>({label:a.title||"",value:Number(a.read)||0})),
+          pm=P.metrics||{},
+          sc=sarts.map(a=>({x:Number(a.read)||0,y:Number(a.share)||0,label:a.title||""})),
+          r=corr(sarts.map(a=>Number(a.read)||0),sarts.map(a=>Number(a.share)||0));
+    return {title:"传播表现 · 效果图谱",sub:`${dd.length} 天日粒度 / ${sarts.length} 条明细 / 总表与单篇明细两个口径互不覆盖`,
+      kv:[["日粒度",`${dd.length} 天`],["总阅读",fmt(R.read)],["篇均",fmt(R.avgRead)],
+        ["TOP1",fmt((top[0]||{}).value)],["画像覆盖",`${fmt(P.covered||0)}/${fmt(P.total||0)}`]],
+      steps:[{label:"网络/离线取数",state:"done",tip:"主路径：管理台用扫码登录态直接下载单篇 .xls；保底：公众号后台手动导出再导入，两者是同一份文件"},
+        {label:"解析入库",state:"done",tip:"一行=一篇文章。总表 read/share 与单篇明细的收藏/在看/渠道/画像共用一套解析器"},
+        {label:"双口径并存",state:"done",tip:"明细阅读另存 detailRead，不覆盖总表 read；来源与采集时点各自标注，口径差单独计数"},
+        {label:"指标现算",state:"now",tip:"趋势、互动、渠道、TOP、相关性、受众、热力全部由快照即时计算，没有缓存和假数据"}],
+      cards:[
+        C("01","每日阅读趋势",`峰 ${fmt(Math.max(0,...read))}`,gLine([{vals:read}],{labels:dd.map(d=>d.date),
+          mean:read.reduce((a,b)=>a+b,0)/Math.max(1,read.length)}),"面积=当日阅读 · 绿线为日均"),
+        C("02","互动构成",`${fmt(sumBy(inter,x=>x))} 次`,gStack([
+          {label:"分享",value:Number(R.share)||0,color:GPAL[0]},{label:"收藏",value:Number(R.fav)||0,color:GPAL[2]},
+          {label:"在看",value:Number(R.like)||0,color:GPAL[3]}]),"分享 / 收藏 / 在看 的占比 · 不含阅读"),
+        C("03","每日互动合计",`${dd.length} 天`,gBars(dd.map((d,i)=>({label:String(d.date||"").slice(5),value:inter[i]}))),"柱高=当日分享+收藏+在看 · 金柱为峰值"),
+        C("04","渠道来源结构",`${ch.length} 类`,gRing(ch,{sub:"阅读人数"}),"单篇明细按阅读人数加权 · 悬停看渠道"),
+        C("05","文章阅读 TOP8",`${fmt(top.length)} 篇`,gHBars(top,{clip:12}),"标题截断显示 · 鼠标悬停看完整标题"),
+        C("06","阅读 × 分享",`r ${r==null?"—":r}`,gScatter(sc,{xLabel:"阅读",yLabel:"分享"}),"每点=一篇文章 · 金线为线性拟合"),
+        C("07","受众 / 流量指标",`${fmt(P.n||0)} 人`,gBars([
+          {label:"男性",value:pm.malePct||0},{label:"核心年龄",value:pm.coreAgePct||0},
+          {label:"推荐占比",value:pm.recommendPct||0},{label:"送达打开",value:pm.deliverOpenRate||0}],
+          {hot:false,max:100,fmtY:k=>Math.round(k)+"%"}),"多篇文章按阅读人数加权 · 单位为 %"),
+        C("08","15 日阅读热力",`${dd.length} 天`,gHeatDays(dd,"read"),"色深=当日阅读 · 悬停看当天数值"),
+        hCard]};
+  }
+
+  if(v==="strategy"){
+    const meta=st.constraintMeta||[],byType={};
+    meta.forEach(x=>{const k=x.type||"其他";byType[k]=(byType[k]||0)+1;});
+    const tp=Number(pr.paired)||0,tt=Number(pr.total)||0,
+          dc=(pr.detailCoverage||{}),sc=Number(st.sampleSize)||0;
+    return {title:"写作策略 · 权重图谱",sub:`${fmt(sc)} 篇配对样本 / ${meta.length} 条硬约束 / 置信度 ${({cold:"冷启动",warm:"积累中",strong:"可信"})[st.confidence||"cold"]}`,
+      kv:[["配对",`${fmt(tp)}/${fmt(tt)}`],["样本",fmt(sc)],["约束",`${meta.length} 条`],
+        ["特征",fmt((strategyCounts||{}).features)],["信号",fmt((strategyCounts||{}).signals)]],
+      steps:[{label:"反馈入库",state:"done",tip:"图文总表逐篇导出后写入 feedback.jsonl，一行=一篇文章"},
+        {label:"特征登记",state:"done",tip:"每篇登记标题句式、开头钩子、内容支柱，历史文章走规则化回填"},
+        {label:"权重计算",state:"done",tip:"按黏性得分（分享/收藏加权）收缩后算各维度权重，自有样本优先于外部信号"},
+        {label:"生成约束",state:"now",tip:"把 top 权重与 avoid 项写成本轮硬约束，交给下一篇写作执行"}],
+      cards:[
+        C("01","样本漏斗",`${fmt(sc)} 入模`,gFunnel([
+          {label:"快照明细",value:sarts.length},{label:"反馈行",value:(strategyCounts||{}).feedback},
+          {label:"已配对",value:tp},{label:"入模样本",value:sc}]),"从导出明细到策略样本的真实收敛"),
+        C("02","样本充分度",`${sc} / 20 篇`,gGauge(Math.min(100,sc/20*100),{label:"距 strong 可信阈值"}),"样本 <8 走冷启动，≥20 才判为可信"),
+        C("03","标题句式权重",`${Object.keys(own.titlePattern||{}).length} 类`,gHBars(wObj(own.titlePattern),{clip:12,fmt:x=>+x.toFixed(2)}),"自有样本收缩后得分 · 越高越优先复用"),
+        C("04","开头钩子权重",`${Object.keys(own.hookType||{}).length} 类`,gHBars(wObj(own.hookType),{clip:12,fmt:x=>+x.toFixed(2)}),"末位为 avoid 项，写作时避开"),
+        C("05","内容支柱权重",`${Object.keys(own.pillar||{}).length} 类`,gRing(wObj(own.pillar),{center:fmt(Object.keys(own.pillar||{}).length),sub:"支柱"}),"仍须遵守四支柱轮转，不连续重复"),
+        C("06","约束类型分布",`${meta.length} 条`,gRing(Object.entries(byType).map(([k,x],i)=>({label:k,value:x,color:GPAL[i%GPAL.length]})),{sub:"条约束"}),"本轮硬约束按类型拆分"),
+        C("07","配对覆盖",`${Math.round(tp/Math.max(1,tt)*100)}%`,gRing([
+          {label:"标题已配对",value:tp,color:"#27e0a0"},{label:"未配对",value:Math.max(0,tt-tp),color:"#ff6b6b"}],
+          {center:`${Math.round(tp/Math.max(1,tt)*100)}%`,sub:"配对率"}),`明细覆盖 ${fmt(dc.filled||0)}/${fmt(dc.total||0)} 篇`),
+        C("08","外部信号 TOP",`${Object.keys(ext.titlePattern||{}).length} 类`,gHBars(wObj(ext.titlePattern),{clip:12,fmt:x=>+x.toFixed(2)}),"近 30 天外部高互动句式 · 仅作备选"),
+        hCard]};
+  }
+
+  if(v==="evolve"){
+    const scores=samples.map(s=>Number(s.score)||0),smax=gMax(scores),bins=6,
+          bh=new Array(bins).fill(0);
+    scores.forEach(x=>{bh[Math.min(bins-1,Math.floor(x/(smax/bins)))]++;});
+    const vers=(eff.versions||[]),low=vers[0]||{},g=Number(eff.globalMean)||0,
+          stCount={};hyps.forEach(h=>{const k=h.status||"wait";stCount[k]=(stCount[k]||0)+1;});
+    const below=vers.filter(x=>x.status==="below"||x.status==="down");
+    return {title:"策略演进 · 版本图谱",sub:`${hist.length} 版快照 / 全局均值 ${g.toFixed(2)} / ${samples.length} 篇样本`,
+      acts:`<button class="tbtn ghost" onclick="doRepair()">对齐台账</button>
+        <button class="tbtn ghost" onclick="writeSkillRules()">写入规则</button>
+        ${below.length?`<button class="tbtn ghost" onclick="rollbackVersion('${esc(String(below[0].version||""))}')">回滚 ${esc(vlab(below[0]))}</button>`:""}`,
+      kv:[["版本",`${hist.length} 版`],["全局均值",g.toFixed(2)],["样本",fmt(samples.length)],
+        ["假设",`${hyps.length} 条`],["真实实验",`${fmt(real)} 篇`]],
+      steps:[{label:"每轮 build",state:"done",tip:"定时任务写完文章后重建策略，落一版不可变快照到 writing_strategy.json"},
+        {label:"版本快照",state:"done",tip:"记录版本号、样本量、置信度、当轮硬约束，可逐版回溯"},
+        {label:"有效性回测",state:"done",tip:"用真实黏性得分对照全局均值，连续两轮低于均值会标记降级"},
+        {label:"假设验证",state:"now",tip:"命中组 vs 控制组满足样本阈值后才计算 lift，未达标一律标「待观察」"}],
+      cards:[
+        C("01","版本样本增长",`${fmt((hist[hist.length-1]||{}).sampleSize||0)} 篇`,gLine([{vals:hist.map(h=>Number(h.sampleSize)||0)}],
+          {labels:hist.map(h=>String(h.builtAt||"").slice(0,10))}),"时间由早到晚 · 斜率即样本积累速度"),
+        C("02","每版约束条数",`${fmt((hist[hist.length-1]||{}).constraints?.length||0)} 条`,gBars(hist.map(h=>({label:vlab(h),value:(h.constraints||[]).length}))),"每版硬约束数量 · 金柱为峰值"),
+        C("03","黏性得分 TOP8",`峰 ${scores.length?Math.max(...scores).toFixed(2):"—"}`,
+          gHBars(samples.slice().sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)).slice(0,8)
+            .map(s=>({label:s.title,value:Number(s.score)||0})),{clip:12,fmt:x=>+x.toFixed(2)}),"得分含分享/收藏加权 · 悬停看完整标题"),
+        C("04","得分分布",`${samples.length} 篇`,gBars(bh.map((n,i)=>({label:`${Math.round(i*smax/bins)}-${Math.round((i+1)*smax/bins)}`,value:n})),{showPeak:false}),"按得分等宽分桶 · 柱高为篇数"),
+        C("05","均值对照",g.toFixed(2),gHBars([
+          {label:"全局均值",value:g,color:GPAL[0]},{label:"本版均值",value:Number(low.meanScore)||0,color:GPAL[2]},
+          {label:"差值",value:(Number(low.meanScore)||0)-g,color:GPAL[4]}],{fmt:x=>+x.toFixed(2)}),"有效性回测：低于全局均值会触发降级判定"),
+        C("06","置信度演进",`${({cold:"冷启动",warm:"积累中",strong:"可信"})[(hist[hist.length-1]||{}).confidence]||"—"}`,
+          gLine([{vals:hist.map(h=>({cold:0,warm:50,strong:100})[h.confidence]||0)}],
+            {labels:hist.map(h=>String(h.builtAt||"").slice(0,10)),fmtY:k=>Math.round(k)}),"0=冷启动 / 50=积累中 / 100=可信"),
+        C("07","假设状态",`${hyps.length} 条`,gRing(Object.entries(stCount).map(([k,x],i)=>({label:{wait:"待观察",ok:"已验证",fail:"已否证"}[k]||k,value:x,color:GPAL[i%GPAL.length]})),{sub:"条假设"}),"未满足样本阈值前一律不判定"),
+        C("08","样本来源",`${fmt(real)} 篇真实`,srcRing(),"历史回填只作参考，不计入实验结论"),
+        hCard]};
+  }
+
+  // attr
+  const byType={};am.forEach(x=>{const k=x.type||"其他";byType[k]=(byType[k]||0)+1;});
+  const pick=Math.max(0,Math.min(am.length-1,attrSelected<0?0:attrSelected));
+  const aTip=x=>`${x.val}（${x.direction}）· 命中 ${(x.hitArticles||[]).length} 篇 / 控制 ${(x.ctrlArticles||[]).length} 篇 · ${x.note||""}`;
+  return {title:"归因矩阵 · 实验图谱",sub:`${am.length} 条约束指令 / ${fmt(asum.wait||0)} 条待观察 / 实测样本 ${fmt(M.real)} 篇`,
+    acts:`<select onchange="attrPick(+this.value)" title="选择要下钻的约束指令">${am.map((x,i)=>
+      `<option value="${i}" ${i===pick?"selected":""}>${esc(gClip(x.val,12))}</option>`).join("")}</select>
+      <button class="tbtn ghost" onclick="renderWall()">刷新图谱</button>`,
+    kv:[["指令",`${am.length} 条`],["待观察",`${fmt(asum.wait||0)} 条`],["显著正向",fmt(asum.significantPos||0)],
+      ["实测样本",`${fmt(M.real)} 篇`],["配对",`${fmt(pr.paired||0)}/${fmt(pr.total||0)}`]],
+    steps:[{label:"登记假设",state:"done",tip:"每篇写作先登记可验证假设与目标维度（句式/支柱/钩子）"},
+      {label:"命中/控制分组",state:"done",tip:"按是否命中约束指令把真实样本分成两组，回填样本单独标注"},
+      {label:"等待样本阈值",state:"now",tip:"单组 <3 篇不计算 lift，状态保持 wait，避免用小样本下结论"},
+      {label:"计算 lift",state:"",tip:"两组都达标后比较黏性均值，显著结论才写入规则池"}],
+    cards:[
+      C("01","归因漏斗",`${fmt(am.length)} 条指令`,gFunnel([
+        {label:"约束指令",value:am.length},{label:"待观察",value:asum.wait||0},
+        {label:"显著结论",value:asum.significantPos||0},{label:"实测样本",value:M.real}]),"从指令到可下结论样本的真实收敛"),
+      C("02","命中 vs 控制均值",`选中 ${gClip((am[pick]||{}).val,5)}`,gBars(am.flatMap(x=>[
+        {label:gClip(x.val,4)+"·命中",value:Number(x.conformMean)||0,color:GPAL[0],tip:aTip(x)},
+        {label:gClip(x.val,4)+"·控制",value:Number(x.ctrlMean)||0,color:GPAL[2],tip:aTip(x)}]),
+        {showPeak:false,fmtY:k=>+k.toFixed(1)}),"分组黏性均值 · 悬停看命中/控制文章数"),
+      C("03","分组样本量",`${fmt(am.length*2)} 格`,gHBars(am.flatMap(x=>[
+        {label:gClip(x.val,7)+" 命中",value:Number(x.nConform)||0,color:GPAL[0]},
+        {label:gClip(x.val,7)+" 控制",value:Number(x.nCtrl)||0,color:GPAL[2]}]),{clip:14}),"每组真实篇数 · 与是否回填分开统计"),
+      C("04","指令类型分布",`${Object.keys(byType).length} 类`,gRing(Object.entries(byType).map(([k,x],i)=>({label:k,value:x,color:GPAL[i%GPAL.length]})),{sub:"条指令"}),"标题句式 / 内容支柱 / 开头钩子"),
+      C("05","距显著阈值","单组 ≥3 篇",gHBars(am.map(x=>({label:gClip(x.val,10),
+        value:Math.max(0,3-Math.min(Number(x.nConform)||0,Number(x.nCtrl)||0))})),{clip:14}),"还需补齐的较少组样本数 · 0 才能判定"),
+      C("06","配对漏斗",`${fmt(pr.paired||0)} 篇`,gFunnel([
+        {label:"快照明细",value:sarts.length},{label:"已配对",value:pr.paired||0},
+        {label:"入模样本",value:st.sampleSize||0},{label:"真实实验",value:M.real}]),"标题配对 → 入模 → 非回填真实样本"),
+      C("07","阅读 × 黏性得分",`${samples.length} 篇`,gScatter(samples.map(s=>({x:Number(s.read)||0,y:Number(s.score)||0,label:s.title||""})),
+        {xLabel:"阅读",yLabel:"黏性得分"}),"每点=一篇文章 · 金线为线性拟合"),
+      C("08","样本来源",`${fmt(real)} 篇真实`,srcRing(),"回填样本只支撑观测，不计入显著性结论"),
+      hCard]};
+}
+
+function renderWall(){
+  if(view!=="local"){paintWall(wallSpec(view));return;}
+  const L=(stats&&stats.local)||{},tl=L.timeline||[],arts=L.articles||[];
+  const tP=sumBy(tl,d=>d.count),tW=sumBy(tl,d=>d.words),act=tl.filter(d=>d.count>0).length;
+  const pk=peakOf(tl,d=>d.count);
+  paintWall({title:"内容生产 · 实时图谱",sub:"8 组指标 / 数据源：本地台账 + 文章矩阵",
+    kv:[["合计",`${fmt(tP)} 篇`],["字数",fmt(tW)],["日均",`${(tP/Math.max(tl.length,1)).toFixed(1)} 篇`],
+      ["有产出",`${act} 天`],["峰值",`${String(pk.date||"—").slice(5)} ${fmt(pk.count||0)} 篇`]],
+    steps:[{label:"本地台账",state:"done",tip:"文章 HTML 与 index.json 是唯一事实源，字数、代码块、封面、草稿状态从文件现算"},
+      {label:"逐篇登记",state:"done",tip:"每篇的日期、字数、代码块、标签、支柱写入台账，不依赖外部接口"},
+      {label:"指标现算",state:"done",tip:"累计、日均、峰值、结构雷达、分布全部由台账即时计算，无缓存、无假数据"},
+      {label:"图谱呈现",state:"now",tip:"宽屏 4×2、窄屏 3×3；本视图底部保留文章矩阵，可点进文章管理"}],
+    cards:[
+      ["01","累计字数增长",fmt(tW)+" 字",wCumulative(tl),"近 14 日累计 · 斜率即当日产能"],
+      ["02","每日产出字数","峰 "+fmt(Math.max(0,...tl.map(d=>Number(d.words)||0)))+" 字",wDaily(tl),"柱高为当日字数 · 金柱为峰值 · 绿线为日均"],
+      ["03","资产完成度",`${L.total||0} 篇`,wRings(L,arts),"四层同心环 · 由外到内：字数/代码/封面/草稿"],
+      ["04","内容结构雷达","近 14 日",wRadar(L,arts,tl),"五维归一 · 青=近 14 日，紫=全期均值"],
+      ["05","四支柱分布",`${(L.pillars||[]).length} 类`,wRose(L),"扇区半径按篇数 · 中心为总篇数"],
+      ["06","标签热度 TOP6",`${(L.tags||[]).length} 个`,wTags(L),"标签在文章中的出现篇数"],
+      ["07","14 日产出热力",`${act}/14 天`,wHeat(tl,L),"色深=当日字数 · 悬停看当天文章"],
+      ["08","篇幅分布",`${L.avgWords||0} 字/篇`,wHist(arts),"按 200 字分桶 · 绿线为均值"],
+      ["09","7 日动能对比","环比",wMomentum(tl),"灰=前 7 日，青=近 7 日 · 右侧为环比"]]});
 }
 
 // 传播视图：网络拉取 / 离线 .xls 双入口共用解析链路，展示快照、互动、渠道与受众指标

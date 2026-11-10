@@ -136,16 +136,23 @@ never hardcoded — swap accounts by editing `data/secrets.json` + `data/config.
 
 ## Dashboard chart wall
 
-The default "内容生产" view renders a wall of 8 charts (9 on narrower screens) computed
-purely from the local ledger: cumulative word curve, daily word bars, four completion
-rings, structure radar (last 14 days vs all-time), pillar rose chart, tag bars, 14-day
-heatmap, length histogram, and 7-day momentum. All inline SVG/CSS — no chart library,
-no network calls, no fabricated numbers. Because only one article is published per day,
-there is deliberately no "articles per day" bar chart (it would be a flat row of 1s).
-Each of the six KPI cards carries a mini area line chart driven by the same real series
-(gradient fill, animated stroke, end dot; hover shows window start/end, delta and peak).
-Only views with a genuine time series (内容生产 / 传播表现) show these charts — no
-fabricated sequences. The other four views keep the original three-panel layout.
+All five tabs now render a chart wall: 8 charts in a 4x2 grid on wide screens, 9 in
+3x3 on narrower ones. The old fixed-height three-panel layout crammed long text and
+tables into 520px and left the article cover marquee crowding the bottom, so it was
+retired for every view (not just "内容生产"). Examples: cumulative word curve / radar /
+rose / heatmap for 内容生产; daily read trend / channel donut / read-vs-share scatter /
+15-day heatmap for 传播表现; sample funnel / confidence gauge / weight bars for
+写作策略; version growth / sticky-score TOP8 / hypothesis status for 策略演进;
+attribution funnel / hit-vs-control bars / distance-to-threshold for 归因矩阵.
+All inline SVG/CSS computed from the local ledger and strategy snapshots — no chart
+library, no network calls, no fabricated numbers (there is deliberately no
+"articles per day" bar chart, since one article is published per day).
+Each wall has a title row with five KV badges plus a STEP bar (hover for the
+data-lineage explanation of that view). KPI cards carry mini area line charts only
+in the two views that have a genuine daily time series. The bottom article-cover
+marquee is shown only on 内容生产; operations (align ledgers / write rules / rollback
+on 策略演进, drill-down selector on 归因矩阵) live at the right of the STEP bar,
+and chart marks expose hit/control article counts on hover.
 
 ## Known pitfall: code-block spacing in drafts
 
