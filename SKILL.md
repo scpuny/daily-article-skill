@@ -137,7 +137,7 @@ never hardcoded — swap accounts by editing `data/secrets.json` + `data/config.
 ## Dashboard chart wall
 
 All five tabs now render a chart wall: 8 charts in a 4x2 grid on wide screens, 9 in
-3x3 on narrower ones. The old fixed-height three-panel layout crammed long text and
+3x3 only below 1280px (where the page is allowed to scroll). The old fixed-height three-panel layout crammed long text and
 tables into 520px and left the article cover marquee crowding the bottom, so it was
 retired for every view (not just "内容生产"). Examples: cumulative word curve / radar /
 rose / heatmap for 内容生产; daily read trend / channel donut / read-vs-share scatter /
@@ -147,12 +147,16 @@ attribution funnel / hit-vs-control bars / distance-to-threshold for 归因矩�
 All inline SVG/CSS computed from the local ledger and strategy snapshots — no chart
 library, no network calls, no fabricated numbers (there is deliberately no
 "articles per day" bar chart, since one article is published per day).
-Each wall has a title row with five KV badges plus a STEP bar (hover for the
-data-lineage explanation of that view). KPI cards carry mini area line charts only
-in the two views that have a genuine daily time series. The bottom article-cover
-marquee is shown only on 内容生产; operations (align ledgers / write rules / rollback
-on 策略演进, drill-down selector on 归因矩阵) live at the right of the STEP bar,
-and chart marks expose hit/control article counts on hover.
+The header is a single row: brand, five view tabs, data-source status, every action
+(import / clear / article manager / settings) and the clock. Each wall has a title
+row with KV badges (five, or three when it also holds operations) — there is no STEP
+bar. KPI cards carry mini area line charts only in the two views with a genuine daily
+time series. The bottom article-cover marquee is shown on every tab; it was shortened
+to 180px so the chart wall can take the remaining viewport height (`.dash` is
+`height:100vh` with a `minmax(0,1fr)` middle row), which removes full-screen
+scrolling. Operations (align ledgers / write rules / rollback on 策略演进,
+drill-down selector on 归因矩阵) live at the right of the title row, and chart marks
+expose hit/control article counts on hover.
 
 ## Known pitfall: code-block spacing in drafts
 

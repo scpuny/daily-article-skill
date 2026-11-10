@@ -26,27 +26,32 @@
       linear-gradient(90deg,rgba(64,158,255,.05) 1px,transparent 1px);
     background-size:40px 40px;mask-image:radial-gradient(circle at 50% 40%,#000,transparent 85%);
   }
-  /* 三栏固定高度：三个视图同一高度、必然等高；栏内内容超高时各自在栏内滚动。
-     页面不做 100vh 裁切——窗口变矮时整页自然向下滚动，非全屏与全屏布局完全一致 */
-  .dash{display:grid;grid-template-rows:auto auto auto 520px auto;
-    gap:12px;padding:14px 18px}
-  /* header */
-  header{display:flex;align-items:center;justify-content:space-between;
-    border:1px solid var(--border);border-radius:14px;padding:11px 20px;
+  /* 顶部工具条合并为单行；整页按视口高度排布，中间图表墙吃掉剩余空间，全屏一屏放下 */
+  .dash{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;
+    gap:12px;padding:14px 18px;height:100vh;min-height:0}
+  /* header：品牌 + 视图 tab + 数据源 + 全部操作 + 时钟，单行不换行 */
+  header{display:flex;align-items:center;gap:12px;min-width:0;flex-wrap:nowrap;
+    border:1px solid var(--border);border-radius:14px;padding:9px 16px;
     background:linear-gradient(90deg,rgba(13,30,58,.7),rgba(8,21,46,.4));
     box-shadow:0 0 0 1px rgba(0,212,255,.06) inset, 0 8px 30px rgba(0,0,0,.35)}
-  header .left{display:flex;align-items:center;gap:14px}
+  header .left{display:flex;align-items:center;gap:12px;flex:0 0 auto}
   .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#2f80ed,#00d4ff);
     display:flex;align-items:center;justify-content:center;font-weight:800;color:#04122b;font-size:18px;
     box-shadow:0 0 18px rgba(0,212,255,.5)}
-  header h1{font-size:20px;margin:0;font-weight:700;letter-spacing:1px;
+  header h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.6px;white-space:nowrap;
     background:linear-gradient(90deg,#bfe0ff,#46e6ff);-webkit-background-clip:text;background-clip:text;color:transparent}
-  header .sub{font-size:11px;color:var(--muted);letter-spacing:3px;margin-top:2px}
-  header .right{display:flex;align-items:center;gap:18px}
-  .clock{text-align:right;padding-left:14px;border-left:1px solid var(--border)}
-  .clock .t{font-size:24px;font-weight:700;color:var(--cyan);font-variant-numeric:tabular-nums;
+  header .sub{font-size:10px;color:var(--muted);letter-spacing:2px;margin-top:2px;white-space:nowrap}
+  header .vtabs{flex:0 0 auto}
+  header .src{flex:1 1 auto;min-width:60px;justify-content:flex-end;flex-wrap:nowrap;
+    overflow:hidden;white-space:nowrap;font-size:11px}
+  header .src>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  header .tacts{flex:0 0 auto;flex-wrap:nowrap;align-items:center}
+  header .tacts .mbtn{padding:6px 12px;font-size:12px}
+  header .tacts .iconbtn{width:32px;height:32px;font-size:14px}
+  .clock{flex:0 0 auto;text-align:right;padding-left:12px;border-left:1px solid var(--border)}
+  .clock .t{font-size:20px;font-weight:700;color:var(--cyan);font-variant-numeric:tabular-nums;
     text-shadow:0 0 14px rgba(70,230,255,.4)}
-  .clock .d{font-size:12px;color:var(--muted)}
+  .clock .d{font-size:11px;color:var(--muted)}
   .iconbtn{cursor:pointer;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
     background:rgba(13,30,58,.6);color:var(--cyan);font-size:16px;display:flex;align-items:center;justify-content:center}
   .iconbtn:hover{background:rgba(0,212,255,.15)}
@@ -145,9 +150,9 @@
     background:rgba(8,21,46,.5)}
   .reach-note b{color:var(--cyan)}
   /* 文章矩阵：向左无缝跑马灯 */
-  .matrix{border:1px solid var(--border);border-radius:14px;padding:13px 16px;background:var(--panel);
+  .matrix{border:1px solid var(--border);border-radius:14px;padding:10px 16px 8px;background:var(--panel);
     display:flex;flex-direction:column;min-height:0;overflow:hidden}
-  .matrix .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap}
+  .matrix .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:12px;flex-wrap:wrap}
   .matrix .head h2{font-size:14px;margin:0;color:#cfe4ff;display:flex;align-items:center;gap:8px}
   .matrix .head h2::before{content:"";width:4px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--accent2),var(--accent))}
   .matrix .tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -155,23 +160,23 @@
   .mbtn{cursor:pointer;border:1px solid var(--border);border-radius:9px;padding:7px 14px;font-size:12.5px;
     font-weight:600;color:var(--cyan);background:rgba(0,212,255,.08);text-decoration:none;white-space:nowrap;font-family:inherit}
   .mbtn:hover{background:rgba(0,212,255,.18);border-color:var(--accent2)}
-  .rail{position:relative;flex:0 0 233px;height:233px;overflow:hidden;padding:7px 0 10px;
+  .rail{position:relative;flex:0 0 180px;height:180px;overflow:hidden;padding:5px 0 6px;
     -webkit-mask-image:linear-gradient(90deg,transparent,#000 56px,#000 calc(100% - 56px),transparent);
     mask-image:linear-gradient(90deg,transparent,#000 56px,#000 calc(100% - 56px),transparent)}
   .rail .track{display:flex;width:max-content;height:100%;align-items:stretch;
     animation:marquee 45s linear infinite;will-change:transform}
   .rail:hover .track,.rail:focus-within .track{animation-play-state:paused}
   @keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-  .rcard{flex:0 0 232px;width:232px;height:216px;margin-right:14px;display:flex;flex-direction:column;
+  .rcard{flex:0 0 232px;width:232px;height:168px;margin-right:14px;display:flex;flex-direction:column;
     border:1px solid var(--border);border-radius:12px;overflow:hidden;cursor:pointer;
     background:linear-gradient(180deg,rgba(16,36,70,.6),rgba(8,21,46,.5));transition:.18s}
   .rcard:hover{transform:translateY(-4px);border-color:var(--accent2);
     box-shadow:0 0 0 1px var(--accent2), 0 0 18px rgba(0,212,255,.35), 0 12px 30px rgba(0,0,0,.45)}
-  .rcard .cv{width:100%;height:128px;object-fit:cover;display:block;
+  .rcard .cv{width:100%;height:96px;object-fit:cover;display:block;
     background:linear-gradient(135deg,#152a4d,#1a1740)}
   .rcard .cv.ph{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px}
-  .rcard .info{padding:10px 12px 11px;flex:1;display:flex;flex-direction:column;min-height:0}
-  .rcard .ti{font-size:14px;font-weight:700;line-height:1.45;color:#f3f8ff;margin:0 0 6px;
+  .rcard .info{padding:8px 11px 7px;flex:1;display:flex;flex-direction:column;min-height:0}
+  .rcard .ti{font-size:13px;font-weight:700;line-height:1.4;color:#f3f8ff;margin:0 0 4px;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;
     text-shadow:0 1px 2px rgba(0,0,0,.45)}
   .rcard .mt{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:6px;
@@ -407,12 +412,12 @@
   .tip-pop.show{display:block}
   .qmark:hover,.stepbar .sp:hover .dot,.mini-grid .m.has-hint:hover{
     border-color:var(--cyan);background:rgba(0,212,255,.12)}
-  /* ===== 第一屏图表墙：仅「内容生产」视图启用，其余视图仍是原三栏 ===== */
+  /* ===== 五个视图统一的第一屏图表墙 ===== */
   .stage{min-height:0;position:relative}
   .stage.wall-on>.mid{display:none}
   .stage>.wall{display:none}
   .stage.wall-on>.wall{display:flex;flex-direction:column;gap:9px;height:100%;min-height:0}
-  .wall-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:0 0 auto;
+  .wall-head{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;min-width:0;flex:0 0 auto;
     border:1px solid var(--border);border-radius:12px;padding:7px 13px;
     background:linear-gradient(90deg,rgba(13,30,58,.72),rgba(8,21,46,.32));
     box-shadow:0 0 0 1px rgba(0,212,255,.05) inset}
@@ -420,23 +425,21 @@
     display:flex;align-items:center;gap:8px}
   .wall-head .wt::before{content:"";width:4px;height:15px;border-radius:2px;
     background:linear-gradient(180deg,var(--cyan),var(--accent));box-shadow:0 0 10px var(--cyan)}
-  .wall-head .wsub{font-size:10.5px;color:var(--muted);white-space:nowrap}
-  .wall-kv{display:flex;gap:5px;flex-wrap:wrap;margin-left:auto}
+  .wall-head .wsub{font-size:10.5px;color:var(--muted);white-space:nowrap;
+    flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .wall-kv{display:flex;gap:5px;flex-wrap:nowrap;margin-left:auto;
+    flex:0 1 auto;min-width:0;overflow:hidden}
   .wall-kv i{font-style:normal;font-size:10px;color:#bcd2f2;border:1px solid rgba(64,158,255,.26);
     background:rgba(6,13,28,.6);border-radius:999px;padding:3px 9px;white-space:nowrap}
   .wall-kv i b{color:var(--cyan);font-weight:800;font-variant-numeric:tabular-nums}
-  .wall-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .wall-acts{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;flex:0 0 auto;
+    margin-left:10px;padding-left:10px;border-left:1px solid rgba(64,158,255,.28)}
+  .wall-head:has(.wall-acts) .wsub{display:none}
   .wall-acts .tbtn{padding:3px 9px;font-size:11px}
   .wall-acts select{color:var(--cyan);background:rgba(6,13,28,.7);border:1px solid var(--border);
     border-radius:8px;padding:3px 8px;font-size:11px;font-family:inherit;cursor:pointer}
   .wall-acts select option{background:#0a1830;color:#cfe4ff}
-  .wall-steps{flex:0 0 auto;padding:0 16px;display:flex;align-items:center;gap:12px}
-  .wall-steps .stepbar{flex:1;min-width:0;margin:0}
-  .wall-steps .stepbar .dot{width:19px;height:19px}
-  .wall-steps .stepbar .sp::before{top:9px}
-  .wall-steps .stepbar .lb{font-size:10.5px}
-  /* 五个视图统一图表墙；只有「内容生产」保留底部文章矩阵 */
-  .dash.no-matrix .matrix{display:none}
+  /* 五个视图统一图表墙；底部文章矩阵在所有视图都保留 */
   .wall-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
     grid-template-rows:repeat(2,minmax(0,1fr));gap:10px}
   .wcard{position:relative;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;
@@ -520,18 +523,24 @@
   @keyframes ksPop{from{opacity:0;transform:scale(.2)}to{opacity:1;transform:scale(1)}}
   @keyframes ksPulse{0%{opacity:.55;transform:scale(.6)}70%{opacity:0;transform:scale(2)}100%{opacity:0;transform:scale(2)}}
   @media (max-width:1500px){
-    .dash{grid-template-rows:auto auto auto auto auto}
-    .stage.wall-on{height:auto}
-    .wall-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:none;grid-auto-rows:225px}
+    header .sub,.wall-head .wsub{display:none}
+    header .src>span:last-child{display:none}
+  }
+  @media (max-width:1280px){
+    .dash{height:auto}
+    .wall-grid{grid-template-columns:repeat(3,minmax(0,1fr));
+      grid-template-rows:none;grid-auto-rows:200px}
     .wcard:nth-child(9){display:flex}
     .stage:not(.wall-on){height:470px}
   }
   @media (max-width:980px){
-    .wall-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .wall-grid{grid-template-columns:repeat(2,minmax(0,1fr));
+      grid-template-rows:none;grid-auto-rows:210px}
   }
   @media (max-width:680px){
     .wall-grid{grid-template-columns:1fr}
     .wall-kv{margin-left:0}
+    header{flex-wrap:wrap}
   }
 </style>
 </head>
@@ -545,14 +554,6 @@
         <div class="sub">CONTENT OPERATION DASHBOARD</div>
       </div>
     </div>
-    <div class="right">
-    <a class="mbtn" href="/manage" style="text-decoration:none">文章管理 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></svg></a>
-    <a class="iconbtn" href="/settings" title="系统设置（配置 / 多主题）" style="text-decoration:none"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg></a>
-      <div class="clock"><div class="t" id="clk">--:--:--</div><div class="d" id="dt">----</div></div>
-    </div>
-  </header>
-
-  <div class="toolbar">
     <div class="vtabs">
       <button class="vtab on" id="tabLocal" onclick="setView('local')">内容生产</button>
       <button class="vtab" id="tabReach" onclick="setView('reach')">传播表现</button>
@@ -564,9 +565,11 @@
     <div class="tacts">
       <button class="tbtn" onclick="openImport()">导入数据</button>
       <button class="tbtn ghost" onclick="clearRemote()">清除</button>
+      <a class="mbtn" href="/manage" style="text-decoration:none">文章管理 <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m0 0-6-6m6 6-6 6"/></svg></a>
+      <a class="iconbtn" href="/settings" title="系统设置（配置 / 多主题）" style="text-decoration:none"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg></a>
     </div>
-  </div>
-
+    <div class="clock"><div class="t" id="clk">--:--:--</div><div class="d" id="dt">----</div></div>
+  </header>
   <div class="kpis" id="kpis"></div>
 
   <div class="stage" id="stage">
@@ -1071,11 +1074,9 @@ function renderKPIs(){
 }
 
 // ---------- 中间区域：五个视图统一图表墙 ----------
-/* 旧版三栏在 520px 固定行高里塞文字/表格，长内容被裁切、底部文章矩阵又占一大块，
-   视觉上就是「变形」。现在所有视图都走同一套图表墙（4×2 / 窄屏 3×3），
-   底部文章矩阵只在「内容生产」保留；每个视图顶部保留一行 STEP 步骤说明。*/
+/* 五个视图统一图表墙（宽屏 4×2 / 窄屏 3×3）；底部文章矩阵在所有视图都显示；
+   顶部不额外放 STEP 条，图表墙高度由 .dash 的 1fr 行按视口自适应，全屏不滚动。*/
 function renderMid(){
-  document.querySelector(".dash").classList.toggle("no-matrix",view!=="local");
   $("stage").classList.add("wall-on");
   renderWall();          // 按 view 分派图表配置
 }
@@ -1898,14 +1899,16 @@ function wMomentum(tl){
     <span>右侧为环比</span></div></div>`;
 }
 
-/* 统一绘制：标题栏 + 一行 STEP 步骤说明 + 图表墙（宽屏 4×2 / 窄屏 3×3） */
+/* 统一绘制：标题栏（含统计 KV 与运维入口）+ 图表墙（宽屏 4×2 / 窄屏 3×3）；不再显示 STEP 条 */
 function paintWall(spec){
+  // 带运维入口的视图只留 3 个 KV，避免标题栏右侧挤压
+  const kv=spec.acts?(spec.kv||[]).slice(0,3):(spec.kv||[]);
   $("wall").innerHTML=`<div class="wall-head">
       <div class="wt">${esc(spec.title)}</div>
       <div class="wsub">${esc(spec.sub||"")}</div>
-      <div class="wall-kv">${(spec.kv||[]).map(x=>`<i>${esc(x[0])} <b>${esc(x[1])}</b></i>`).join("")}</div>
-    </div><div class="wall-steps">${stepBar(spec.steps||[])}
-      ${spec.acts?`<div class="wall-acts">${spec.acts}</div>`:""}</div><div class="wall-grid">`+
+      <div class="wall-kv">${kv.map(x=>`<i>${esc(x[0])} <b>${esc(x[1])}</b></i>`).join("")}</div>
+      ${spec.acts?`<div class="wall-acts">${spec.acts}</div>`:""}
+    </div><div class="wall-grid">`+
     spec.cards.map(c=>`<div class="wcard"><div class="ch"><span class="no">${c[0]}</span>
       <span class="ct">${c[1]}</span><span class="cv">${c[2]}</span></div>
       <div class="cs">${c[3]}</div><div class="cf">${c[4]}</div></div>`).join("")+`</div>`;
@@ -1942,10 +1945,6 @@ function wallSpec(v){
     return {title:"传播表现 · 效果图谱",sub:`${dd.length} 天日粒度 / ${sarts.length} 条明细 / 总表与单篇明细两个口径互不覆盖`,
       kv:[["日粒度",`${dd.length} 天`],["总阅读",fmt(R.read)],["篇均",fmt(R.avgRead)],
         ["TOP1",fmt((top[0]||{}).value)],["画像覆盖",`${fmt(P.covered||0)}/${fmt(P.total||0)}`]],
-      steps:[{label:"网络/离线取数",state:"done",tip:"主路径：管理台用扫码登录态直接下载单篇 .xls；保底：公众号后台手动导出再导入，两者是同一份文件"},
-        {label:"解析入库",state:"done",tip:"一行=一篇文章。总表 read/share 与单篇明细的收藏/在看/渠道/画像共用一套解析器"},
-        {label:"双口径并存",state:"done",tip:"明细阅读另存 detailRead，不覆盖总表 read；来源与采集时点各自标注，口径差单独计数"},
-        {label:"指标现算",state:"now",tip:"趋势、互动、渠道、TOP、相关性、受众、热力全部由快照即时计算，没有缓存和假数据"}],
       cards:[
         C("01","每日阅读趋势",`峰 ${fmt(Math.max(0,...read))}`,gLine([{vals:read}],{labels:dd.map(d=>d.date),
           mean:read.reduce((a,b)=>a+b,0)/Math.max(1,read.length)}),"面积=当日阅读 · 绿线为日均"),
@@ -1972,10 +1971,6 @@ function wallSpec(v){
     return {title:"写作策略 · 权重图谱",sub:`${fmt(sc)} 篇配对样本 / ${meta.length} 条硬约束 / 置信度 ${({cold:"冷启动",warm:"积累中",strong:"可信"})[st.confidence||"cold"]}`,
       kv:[["配对",`${fmt(tp)}/${fmt(tt)}`],["样本",fmt(sc)],["约束",`${meta.length} 条`],
         ["特征",fmt((strategyCounts||{}).features)],["信号",fmt((strategyCounts||{}).signals)]],
-      steps:[{label:"反馈入库",state:"done",tip:"图文总表逐篇导出后写入 feedback.jsonl，一行=一篇文章"},
-        {label:"特征登记",state:"done",tip:"每篇登记标题句式、开头钩子、内容支柱，历史文章走规则化回填"},
-        {label:"权重计算",state:"done",tip:"按黏性得分（分享/收藏加权）收缩后算各维度权重，自有样本优先于外部信号"},
-        {label:"生成约束",state:"now",tip:"把 top 权重与 avoid 项写成本轮硬约束，交给下一篇写作执行"}],
       cards:[
         C("01","样本漏斗",`${fmt(sc)} 入模`,gFunnel([
           {label:"快照明细",value:sarts.length},{label:"反馈行",value:(strategyCounts||{}).feedback},
@@ -2005,10 +2000,6 @@ function wallSpec(v){
         ${below.length?`<button class="tbtn ghost" onclick="rollbackVersion('${esc(String(below[0].version||""))}')">回滚 ${esc(vlab(below[0]))}</button>`:""}`,
       kv:[["版本",`${hist.length} 版`],["全局均值",g.toFixed(2)],["样本",fmt(samples.length)],
         ["假设",`${hyps.length} 条`],["真实实验",`${fmt(real)} 篇`]],
-      steps:[{label:"每轮 build",state:"done",tip:"定时任务写完文章后重建策略，落一版不可变快照到 writing_strategy.json"},
-        {label:"版本快照",state:"done",tip:"记录版本号、样本量、置信度、当轮硬约束，可逐版回溯"},
-        {label:"有效性回测",state:"done",tip:"用真实黏性得分对照全局均值，连续两轮低于均值会标记降级"},
-        {label:"假设验证",state:"now",tip:"命中组 vs 控制组满足样本阈值后才计算 lift，未达标一律标「待观察」"}],
       cards:[
         C("01","版本样本增长",`${fmt((hist[hist.length-1]||{}).sampleSize||0)} 篇`,gLine([{vals:hist.map(h=>Number(h.sampleSize)||0)}],
           {labels:hist.map(h=>String(h.builtAt||"").slice(0,10))}),"时间由早到晚 · 斜率即样本积累速度"),
@@ -2038,10 +2029,6 @@ function wallSpec(v){
       <button class="tbtn ghost" onclick="renderWall()">刷新图谱</button>`,
     kv:[["指令",`${am.length} 条`],["待观察",`${fmt(asum.wait||0)} 条`],["显著正向",fmt(asum.significantPos||0)],
       ["实测样本",`${fmt(M.real)} 篇`],["配对",`${fmt(pr.paired||0)}/${fmt(pr.total||0)}`]],
-    steps:[{label:"登记假设",state:"done",tip:"每篇写作先登记可验证假设与目标维度（句式/支柱/钩子）"},
-      {label:"命中/控制分组",state:"done",tip:"按是否命中约束指令把真实样本分成两组，回填样本单独标注"},
-      {label:"等待样本阈值",state:"now",tip:"单组 <3 篇不计算 lift，状态保持 wait，避免用小样本下结论"},
-      {label:"计算 lift",state:"",tip:"两组都达标后比较黏性均值，显著结论才写入规则池"}],
     cards:[
       C("01","归因漏斗",`${fmt(am.length)} 条指令`,gFunnel([
         {label:"约束指令",value:am.length},{label:"待观察",value:asum.wait||0},
@@ -2073,10 +2060,6 @@ function renderWall(){
   paintWall({title:"内容生产 · 实时图谱",sub:"8 组指标 / 数据源：本地台账 + 文章矩阵",
     kv:[["合计",`${fmt(tP)} 篇`],["字数",fmt(tW)],["日均",`${(tP/Math.max(tl.length,1)).toFixed(1)} 篇`],
       ["有产出",`${act} 天`],["峰值",`${String(pk.date||"—").slice(5)} ${fmt(pk.count||0)} 篇`]],
-    steps:[{label:"本地台账",state:"done",tip:"文章 HTML 与 index.json 是唯一事实源，字数、代码块、封面、草稿状态从文件现算"},
-      {label:"逐篇登记",state:"done",tip:"每篇的日期、字数、代码块、标签、支柱写入台账，不依赖外部接口"},
-      {label:"指标现算",state:"done",tip:"累计、日均、峰值、结构雷达、分布全部由台账即时计算，无缓存、无假数据"},
-      {label:"图谱呈现",state:"now",tip:"宽屏 4×2、窄屏 3×3；本视图底部保留文章矩阵，可点进文章管理"}],
     cards:[
       ["01","累计字数增长",fmt(tW)+" 字",wCumulative(tl),"近 14 日累计 · 斜率即当日产能"],
       ["02","每日产出字数","峰 "+fmt(Math.max(0,...tl.map(d=>Number(d.words)||0)))+" 字",wDaily(tl),"柱高为当日字数 · 金柱为峰值 · 绿线为日均"],
