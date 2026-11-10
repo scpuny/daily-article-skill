@@ -124,6 +124,12 @@
   .status-card.good .t{color:var(--ok)}
   .status-card .m{color:#cfe4ff;font-size:12px;line-height:1.5}
   .status-card .sub{color:var(--muted);font-size:11px;margin-top:4px}
+  /* 来源徽标：每个指标的出处与采集时点，hover/点击看完整口径 */
+  .src-row{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:7px 0 2px}
+  .src-tag{font-size:10px;line-height:1.4;padding:3px 7px;border-radius:6px;white-space:nowrap;
+    border:1px solid rgba(0,212,255,.28);background:rgba(0,212,255,.08);color:#9ceaff;cursor:help}
+  .src-tag.alt{border-color:rgba(39,224,160,.32);background:rgba(39,224,160,.08);color:#8ce7c4}
+  .src-tag.warn{border-color:rgba(255,184,92,.40);background:rgba(255,184,92,.10);color:#ffb85c}
   .steps{width:100%;display:flex;flex-direction:column;gap:5px}
   .step{display:flex;gap:9px;align-items:flex-start;color:#bcd2f2;font-size:12px;line-height:1.6}
   .step .n{flex:0 0 18px;height:18px;border-radius:50%;border:1px solid var(--accent2);
@@ -614,7 +620,7 @@ document.addEventListener("mouseout",e=>{
 });
 document.addEventListener("click",e=>{
   // 只有口径徽标支持「点一下钉住慢读」，避免普通按钮被误接管
-  const el=e.target&&e.target.closest?e.target.closest(".qmark,.mini-grid .m.has-hint,.stepbar .sp"):null;
+  const el=e.target&&e.target.closest?e.target.closest(".qmark,.mini-grid .m.has-hint,.stepbar .sp,.src-tag"):null;
   if(!el){hideTip();return;}
   const t=tipTextOf(el);
   if(t){showTip(el,t);tipPinned=true;}
@@ -1402,40 +1408,52 @@ function renderGuide(){
   const s=stats||{},R=s.remoteSummary||{},M=derive();
   const good=s.source!=="none";
   const last=(s.daily||[]).reduce((m,d)=>d.date>m?d.date:m,"");
-  const P=(stats&&stats.profile)||{}, pm=P.metrics||{}, ch=P.channels||{};
+  const P=(stats&&stats.profile)||{}, pm=P.metrics||{}, ch=P.channels||{}, S=P.sources||{};
+  const at=t=>t?String(t).slice(5,16).replace("T"," "):"—", drift=Number(S.readDrift||0);
   const summary=good?`${M.dailyN} 天日粒度 · ${M.artN} 条明细 · 截至 ${last||"—"}`:"尚未导入传播快照，本地指标仍实时计算";
+  const srcTip="一行 = 一篇文章。read/share 来自图文总表（每篇一行的汇总）；收藏/在看/点赞/完读率/渠道/画像来自单篇数据明细。明细的阅读人数另存 detailRead，不覆盖总表值，两者因导出时点不同可能不一致；大屏标注各自来源与采集时间，历史数值不重算。";
+  const srcBar=`<div class="src-row">
+    <span class="src-tag" title="图文总表导出：行内 read / share / date / title。快照更新 ${esc(at(S.snapshotAt))}；KPI 的总阅读、篇均、TOP1 由这些逐篇值现算求和。">总表 · ${esc(at(S.snapshotAt))}</span>
+    <span class="src-tag alt" title="单篇数据明细：fav / watch / thumb / 完读率 / 渠道 / 漏斗 / 性别·年龄·地域画像。最近采集 ${esc(at(S.detailAt))}，已覆盖 ${fmt(S.covered||0)}/${fmt(S.total||0)} 篇。">单篇明细 · ${esc(at(S.detailAt))} · ${fmt(S.covered||0)}/${fmt(S.total||0)}</span>
+    ${drift?`<span class="src-tag warn" title="总表 read 与单篇明细 detailRead 不一致的篇数。两个导出时点不同属正常，行内两个值都保留，可逐篇核对 byArticle。">口径差 ${drift} 篇</span>`:""}
+  </div>`;
   let html=`<div class="stack"><div class="status-card ${good?'good':''}">
-    <div class="t">${good?"传播数据快照":"暂无传播快照"}</div>
+    <div class="t">${good?"传播数据快照":"暂无传播快照"}${qmark(srcTip)}</div>
     <div class="m">${esc(summary)}</div>
-    <div class="sub">来源：<b style="color:#46e6ff">扫码登录态网络拉取 / 离线 .xls</b> · 画像覆盖 ${fmt(P.covered||0)}/${fmt(P.total||0)} 篇${s.updatedAt?" · 更新 "+esc(String(s.updatedAt).slice(0,16)):""}</div></div>`;
+    <div class="sub">取数：<b style="color:#46e6ff">扫码登录态网络拉取 / 离线 .xls</b> · 画像覆盖 ${fmt(P.covered||0)}/${fmt(P.total||0)} 篇${s.updatedAt?" · 更新 "+esc(String(s.updatedAt).slice(0,16)):""}</div></div>`;
+  html+=srcBar;
   html+=stepBar([
     {label:"网络/离线取数",state:good?"done":"now",tip:"主路径：管理台「拉取明细」用扫码登录态直接下载单篇 .xls，拿到的是最新快照；保底：公众号后台手动导出到下载目录再导入。两者是同一份文件，共用解析链路"},
     {label:"解析入库",state:good?"done":"",tip:"两条入口拿到的是同一份单篇 .xls：网络拉取直接进内存解析；离线保底则用「导入数据」选文件。画像 / 渠道 / 转化漏斗共用一套解析器"},
-    {label:"看指标",state:good?"now":"",tip:"传播表现视图展示阅读 / 互动 / 篇均 / 发文×阅读相关系数；本地指标始终实时计算"}
+    {label:"看指标",state:good?"now":"",tip:"传播表现视图展示阅读 / 互动 / 篇均 / 发文×阅读相关系数；本地指标始终实时计算。总表与单篇明细两个口径的来源、采集时点标在下方来源徽标，指标格 ? 可看单项口径"}
   ]);
-  html+=`<div class="st-sec">流量结构${qmark("单篇明细「阅读数据趋势明细」按渠道汇总；推荐占比 = 推荐阅读 / 各渠道阅读之和；送达打开率 = 公众号消息阅读人数 / 送达人数；分享裂变 = 分享产生的阅读人数 / 总分享人数。多篇文章按阅读人数加权")}</div>`+cells([
+  html+=`<div class="st-sec">流量结构${qmark("来源：单篇明细「阅读数据趋势明细」，采集时点见上方徽标。推荐占比 = 推荐阅读 / 各渠道阅读之和；送达打开率 = 公众号消息阅读人数 / 送达人数；分享裂变 = 分享产生的阅读人数 / 总分享人数。多篇文章按阅读人数加权")}</div>`+cells([
     ["推荐占比",pm.recommendPct!=null?pm.recommendPct+"%":"—"],
     ["送达打开率",pm.deliverOpenRate!=null?pm.deliverOpenRate+"%":"—"],
     ["分享裂变",pm.shareViral!=null?pm.shareViral:"—"],
     ["渠道数",Object.keys(ch).length||"—"],
-    ["已覆盖",`${fmt(P.covered||0)} / ${fmt(P.total||0)} 篇`],
-    ["样本基数",`${fmt(P.n||0)} 人`]
+    ["已覆盖",`${fmt(P.covered||0)} / ${fmt(P.total||0)} 篇`,"带单篇明细画像的篇数 / 台账总篇数；来源：单篇数据明细"],
+    ["样本基数",`${fmt(P.n||0)} 人`,"各篇单篇明细「阅读(人)」之和（画像 n），不是总表 read 求和"]
   ]);
-  html+=`<div class="st-sec">受众结构${qmark("单篇明细性别 / 年龄 / 地域分布；26-45 岁为 26-35 与 36-45 两档之和；地域 HHI = 各省占比平方和，越小越分散。按阅读人数加权，小样本篇会带 n 标记，不作为结论")}</div>`+cells([
+  html+=`<div class="st-sec">受众结构${qmark("来源：单篇明细性别 / 年龄 / 地域分布，采集时点见上方徽标。26-45 岁为 26-35 与 36-45 两档之和；地域 HHI = 各省占比平方和，越小越分散。按阅读人数加权，小样本篇会带 n 标记，不作为结论")}</div>`+cells([
     ["男性占比",pm.malePct!=null?pm.malePct+"%":"—"],
     ["26-45岁",pm.coreAgePct!=null?pm.coreAgePct+"%":"—"],
     ["TOP1省份",pm.topRegion||"—"],
     ["省份数",pm.regionCount!=null?pm.regionCount:"—"],
     ["地域HHI",pm.regionHHI!=null?pm.regionHHI:"—"],
-    ["待补全",`${fmt(P.gap||0)} 篇`]
+    ["待补全",`${fmt(P.gap||0)} 篇`,"缺单篇明细画像的篇数；在 /manage 点卡片「拉取」或「重拉」补齐"]
   ])
   html+=`<div class="st-sec">快照健康度${qmark("日粒度天数、明细条数、快照距今小时数、零阅读篇数、明细覆盖率、日均阅读；覆盖率 = 明细条数 / 本地文章数")}</div>`+cells([
     ["日粒度",`${M.dailyN} 天`],["明细",`${M.artN} 条`],["距今",`${M.freshH??"—"} h`],
     ["零阅读",`${M.zeroRead} 篇`],["覆盖率",M.cover!=null?M.cover+"%":"—"],["日均阅读",M.avgDailyRead??"—"]
   ]);
-  html+=`<div class="st-sec">互动质量${qmark("总阅读 / 分享 / 收藏 / 在看、篇均阅读、TOP1 阅读占比；全部由已导入快照现算")}</div>`+cells([
-    ["总阅读",fmt(R.read||0)],["分享",fmt(R.share||0)],["收藏",fmt(R.fav||0)],
-    ["在看",fmt(R.like||0)],["篇均阅读",fmt(R.avgRead||0)],["TOP1 占比",M.top1Share!=null?M.top1Share+"%":"—"]
+  html+=`<div class="st-sec">互动质量${qmark("混合口径：总阅读 / 分享 / 篇均 / TOP1 来自图文总表逐篇值求和；收藏 / 在看 来自单篇数据明细汇总后同步进快照。全部由已导入数据现算，来源徽标标注各自采集时点")}</div>`+cells([
+    ["总阅读",fmt(R.read||0),"图文总表逐篇 read 求和；不是单篇明细 detailRead 之和"],
+    ["分享",fmt(R.share||0),"图文总表逐篇 share 求和"],
+    ["收藏",fmt(R.fav||0),"单篇数据明细汇总后同步到快照"],
+    ["在看",fmt(R.like||0),"单篇数据明细（在看 + 点赞）汇总后同步到快照"],
+    ["篇均阅读",fmt(R.avgRead||0),"图文总表：总阅读 / 明细篇数"],
+    ["TOP1 占比",M.top1Share!=null?M.top1Share+"%":"—"]
   ]);
   html+=`<div class="st-sec">快照时点</div>`+cells([
     ["数据截至",last||"—"],["更新于",String(s.updatedAt||"—").slice(11,19)],

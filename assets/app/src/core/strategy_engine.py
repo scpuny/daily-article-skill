@@ -574,17 +574,39 @@ def _profile_patch(text, vals):
             "profile": d["profile"], "metrics": d["metrics"]}
 
 
+def _source_meta(rows):
+    """两个口径的来源与采集时间，供大屏标注（只读，不改任何历史数值）。"""
+    try:
+        import stats_provider
+        snap_at = str((stats_provider._cache() or {}).get("updatedAt") or "")
+    except Exception:
+        snap_at = ""
+    fetched = [str(r.get("detailFetchedAt") or "") for r in rows
+               if r.get("detailFetchedAt")]
+    with_detail = [r for r in rows if r.get("detailRead") is not None
+                   or r.get("detailFrom")]
+    drift = sum(1 for r in rows if r.get("detailRead") is not None
+                and _pnum(r.get("detailRead")) != _pnum(r.get("read")))
+    return {"snapshotAt": snap_at, "detailAt": max(fetched) if fetched else "",
+            "covered": len(with_detail),
+            "total": len([r for r in rows if r.get("title")]),
+            "readDrift": drift}
+
+
 def profile_summary():
     """聚合所有带画像的 feedback 行，供大屏 /api/stats 展示（只读、不写盘）。
 
     按各篇阅读人数 n 加权，避免小样本（如 n=30）与大盘（n=240）等权拉偏结论。
+    sources 说明 read/share 与互动/画像分别来自哪个导出、何时采集，以及两口径
+    阅读人数不一致的篇数，避免把「总表值」误读成「单篇明细值」。
     """
     rows = _jsonl("feedback.jsonl")
     total = len([r for r in rows if r.get("title")])
     covered = [r for r in rows if r.get("profile")]
     if not covered:
         return {"covered": 0, "total": total, "gap": total, "n": 0,
-                "metrics": {}, "channels": {}, "byArticle": [], "stability": {}}
+                "metrics": {}, "channels": {}, "byArticle": [], "stability": {},
+                "sources": _source_meta(rows)}
 
     def n_of(r):
         return _pnum((r.get("profile") or {}).get("n")) or 0
@@ -609,10 +631,12 @@ def profile_summary():
                 region_total[k] = region_total.get(k, 0) + (_pnum(v) or 0) * n
     by_article = [{
         "title": r.get("title"), "date": r.get("date"), "n": n_of(r),
+        "read": _pnum(r.get("read")), "detailRead": _pnum(r.get("detailRead")),
         "recommendPct": (r.get("metrics") or {}).get("recommendPct"),
         "malePct": (r.get("metrics") or {}).get("malePct"),
         "deliverOpenRate": (r.get("metrics") or {}).get("deliverOpenRate"),
         "source": r.get("detailFrom") or "",
+        "fetchedAt": r.get("detailFetchedAt") or "",
     } for r in covered]
     return {
         "covered": len(covered), "total": total, "gap": max(0, total - len(covered)),
@@ -629,13 +653,20 @@ def profile_summary():
         "byArticle": sorted(by_article, key=lambda x: x["n"], reverse=True),
         "stability": {"malePctRange": rng("malePct"),
                       "recommendPctRange": rng("recommendPct")},
+        "sources": _source_meta(rows),
     }
 
 
-def _detail_patch(vals, source):
-    """单篇明细 → feedback 行的互动字段补丁（第四批手动导入 / 第五批按钮拉取共用）。
+_DETAIL_META_KEYS = ("detailFrom", "detailFetchedAt")
 
-    只补互动，绝不动 read/share/date/title/ts；like = 在看 + 点赞，得分口径不变。
+
+def _detail_patch(vals, source):
+    """单篇明细 → feedback 行的互动字段补丁（离线导入 / 按钮拉取共用）。
+
+    口径 B（2026-11-10）：绝不覆盖 read/share/date/title/ts —— 行内 read/share
+    来自「图文总表」导入，单篇明细的阅读/分享人数另存 detailRead/detailShare，
+    两个口径并存、互不覆盖，且各自有来源与采集时间可追溯。
+    like = 在看 + 点赞，得分口径不变。
     """
     iv = lambda k: int(vals.get(k) or 0)
     patch = {"fav": iv("fav"), "watch": iv("watch"), "thumb": iv("thumb")}
@@ -646,18 +677,39 @@ def _detail_patch(vals, source):
     for k in FLOAT_DETAIL_KEYS:
         if k in vals:
             patch[k] = round(vals[k], 4)
+    if "read" in vals:
+        patch["detailRead"] = int(vals["read"])
+    if "share" in vals:
+        patch["detailShare"] = int(vals["share"])
     patch["detailFrom"] = str(source or "")
+    patch["detailFetchedAt"] = datetime.now().isoformat(timespec="seconds")
     return patch
 
 
 def _same_detail_values(r, patch):
     """幂等比较只看表现字段。
 
-    detailFrom 是「这次是哪个文件写进来的」溯源标签，不同来源（手动导文件名 /
-    批量拉取 msgid）值必然不同；若把它算进比较，同一份数据换个文件名就会被判成
-    「有新变化」而反复写盘，也可能让两个不同文件的导入互相干扰。
+    detailFrom / detailFetchedAt 是「这次从哪来、什么时候采的」溯源标签，
+    不同来源（手动导文件名 / 批量拉取 msgid）值必然不同；算进比较会让同一份
+    数据换个文件名就被判成「有新变化」，也可能让两个文件的导入互相干扰。
     """
-    return all(r.get(k) == v for k, v in patch.items() if k != "detailFrom")
+    return all(r.get(k) == v for k, v in patch.items()
+               if k not in _DETAIL_META_KEYS)
+
+
+def _apply_detail_patch(rows, r, patch):
+    """补丁落盘。数值没变也刷新来源/采集时间，保证「最近一次核验」真实可追溯。
+
+    返回 (数值是否变化, 是否写盘)：数值未变时仍是 idempotent，不重算历史。
+    """
+    changed = not _same_detail_values(r, patch)
+    meta = {k: patch[k] for k in _DETAIL_META_KEYS if k in patch}
+    touched = any(r.get(k) != v for k, v in meta.items())
+    if not changed and not touched:
+        return False, False
+    r.update(patch)
+    _save_jsonl("feedback.jsonl", rows)
+    return changed, True
 
 
 _DETAIL_FIELD_KEYS = ("fav", "watch", "thumb", "like", "listen", "follow",
@@ -713,8 +765,9 @@ def _sync_stats_cache_interaction():
 def absorb_single_detail(text, filename=""):
     """把单篇明细的互动字段 UPSERT 回 feedback.jsonl 已有行（按标题唯一命中）。
 
-    绝不改 read/share/date/title；命中 0 篇或多篇一律跳过并给诊断，宁可漏补不可错补。
-    幂等：值全相同则不写盘，保留原有 ts。
+    绝不改 read/share/date/title；单篇明细的阅读人数另存 detailRead，与总表值并存。
+    命中 0 篇或多篇一律跳过并给诊断，宁可漏补不可错补。
+    幂等：值全相同只刷新来源/采集时间，保留原有 ts 与历史数值。
     """
     vals = parse_single_detail(text)
     if not vals:
@@ -730,21 +783,16 @@ def absorb_single_detail(text, filename=""):
     r = rows[hits[0]]
     patch = _detail_patch(vals, filename)
     patch.update(_profile_patch(text, vals))      # 离线入口：画像/渠道/漏斗
-    if _same_detail_values(r, patch):
-        # 台账已补全但快照可能仍是旧的（本次修复前导入的），仍做一次增量对齐
-        synced = _sync_stats_cache_interaction()
-        detail = sync_detail_source(r.get("title"), filename)
-        return {"ok": True, "matched": 1, "updated": 0, "idempotent": True,
-                "title": r.get("title"), "reason": "数据已是最新，无需重复写入",
-                "fields": _detail_fields(patch), "statsSynced": synced,
-                "detailIndex": detail}
-    r.update(patch)
-    _save_jsonl("feedback.jsonl", rows)
+    changed, wrote = _apply_detail_patch(rows, r, patch)
     synced = _sync_stats_cache_interaction()
     detail = sync_detail_source(r.get("title"), filename)
-    return {"ok": True, "matched": 1, "updated": 1, "title": r.get("title"),
+    base = {"ok": True, "matched": 1, "title": r.get("title"),
             "fields": _detail_fields(patch), "statsSynced": synced,
             "detailIndex": detail}
+    if not changed:
+        return {**base, "updated": 0, "idempotent": True, "metaUpdated": wrote,
+                "reason": "数据已是最新，无需重复写入"}
+    return {**base, "updated": 1}
 
 
 def absorb_single_file(data_b64, filename=""):
@@ -972,20 +1020,16 @@ def absorb_single_values(vals, title, date_str="", source="batch", text=""):
     patch = _detail_patch(vals, source)
     if text:
         patch.update(_profile_patch(text, vals))  # 网络入口：同一份 xls 的扩展区块
-    if _same_detail_values(r, patch):
-        synced = _sync_stats_cache_interaction()
-        detail = sync_detail_source(r.get("title"), source)
-        return {"ok": True, "matched": 1, "updated": 0, "idempotent": True,
-                "title": r.get("title"), "reason": "数据已是最新，无需重复写入",
-                "fields": _detail_fields(patch), "statsSynced": synced,
-                "detailIndex": detail}
-    r.update(patch)
-    _save_jsonl("feedback.jsonl", rows)
+    changed, wrote = _apply_detail_patch(rows, r, patch)
     synced = _sync_stats_cache_interaction()
     detail = sync_detail_source(r.get("title"), source)
-    return {"ok": True, "matched": 1, "updated": 1, "title": r.get("title"),
+    base = {"ok": True, "matched": 1, "title": r.get("title"),
             "fields": _detail_fields(patch), "statsSynced": synced,
             "detailIndex": detail}
+    if not changed:
+        return {**base, "updated": 0, "idempotent": True, "metaUpdated": wrote,
+                "reason": "数据已是最新，无需重复写入"}
+    return {**base, "updated": 1}
 
 
 def _detail_mark(msgid, **fields):
