@@ -180,7 +180,8 @@
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;
     text-shadow:0 1px 2px rgba(0,0,0,.45)}
   .rcard .mt{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:6px;
-    font-size:11px;color:var(--muted)}
+    font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden}
+  .rcard .mt>span:not(.seq):not(.chip){overflow:hidden;text-overflow:ellipsis}
   .rcard .seq{color:var(--accent2);font-weight:700;letter-spacing:.5px;white-space:nowrap}
   .chip{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:600;white-space:nowrap}
   .chip.pub{background:rgba(39,224,160,.15);color:var(--ok)}
@@ -454,16 +455,18 @@
   @keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
   .wcard::after{content:"";position:absolute;left:0;right:0;top:0;height:1px;
     background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.6}
-  .wcard .ch{display:flex;align-items:baseline;gap:7px;flex:0 0 auto;z-index:1}
+  .wcard .ch{display:flex;align-items:baseline;gap:7px;flex:0 0 auto;z-index:2;position:relative}
   .wcard .no{font-size:9px;font-weight:800;color:#04122b;background:var(--cyan);border-radius:4px;
     padding:1px 5px;letter-spacing:.5px;box-shadow:0 0 10px rgba(0,212,255,.5)}
   .wcard .ct{font-size:12px;font-weight:700;color:#dceeff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wcard .cv{margin-left:auto;font-size:13.5px;font-weight:800;color:var(--cyan);white-space:nowrap;
     font-variant-numeric:tabular-nums;text-shadow:0 0 12px rgba(70,230,255,.45)}
+  /* 图表区：size containment 让 HTML 版图表无法撑大卡片，超出部分裁掉而不是盖住标题
+     （短视口下 hbars 之类 HTML 图表会超出，曾出现标签压住卡片标题） */
   .wcard .cs{flex:1;min-height:0;position:relative;display:flex;align-items:stretch;
-    justify-content:center;z-index:1;margin-top:3px}
+    justify-content:center;z-index:1;margin-top:3px;overflow:hidden;container-type:size}
   .wcard .cs svg{width:100%;height:100%;display:block}
-  .wcard .cf{flex:0 0 auto;font-size:9.5px;color:var(--muted);margin-top:2px;z-index:1;
+  .wcard .cf{flex:0 0 auto;font-size:9.5px;color:var(--muted);margin-top:2px;z-index:2;position:relative;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* 图表入场动画（统一在渲染后加 .go） */
   .a-bar{transform-box:fill-box;transform-origin:bottom;transform:scaleY(0);
@@ -485,9 +488,10 @@
   .a-w.go{transform:scaleX(1)}
   .a-blink{animation:blink 2.1s ease-in-out infinite}
   @keyframes blink{0%,100%{opacity:1}50%{opacity:.32}}
-  /* 标签热度条形（HTML 版，宽度动画更可控） */
-  .hbars{display:flex;flex-direction:column;gap:7px;justify-content:center;width:100%;height:100%}
-  .hbar{display:flex;align-items:center;gap:7px;font-size:10.5px;color:#cfe4ff;min-width:0}
+  /* 标签热度条形（HTML 版，宽度动画更可控）；行高按容器高度自适应收缩，绝不越界 */
+  .hbars{display:flex;flex-direction:column;gap:7px;justify-content:center;width:100%;height:100%;
+    overflow:hidden;min-height:0}
+  .hbar{display:flex;align-items:center;gap:7px;font-size:10.5px;color:#cfe4ff;min-width:0;flex:0 0 auto}
   .hbar .hn{flex:0 0 78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hbar .ht{flex:1;height:9px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden;min-width:0}
   .hbar .ht i{display:block;height:100%;border-radius:6px;width:0;transition:width .95s cubic-bezier(.2,.85,.25,1);
@@ -541,6 +545,51 @@
     .wall-grid{grid-template-columns:1fr}
     .wall-kv{margin-left:0}
     header{flex-wrap:wrap}
+  }
+  /* 卡片很矮时（1366×768 这类投影/笔记本屏）HTML 版图表按容器高度收字号，避免越界与压字 */
+  @container (max-height:124px){
+    .hbars{gap:3px}
+    .hbar{font-size:9px;gap:5px}
+    .hbar .hn{flex-basis:62px}
+    .hbar .ht{height:6px}
+    .hbar .hv{flex-basis:22px}
+    .mom{gap:5px}
+    .mrow{font-size:9px;gap:5px}
+    .mrow .ml{flex-basis:46px}
+    .mrow b{flex-basis:38px;font-size:10px}
+    .mfoot{font-size:8.5px;gap:8px}
+  }
+  @container (max-height:92px){
+    .hbars{gap:2px}
+    .hbar{font-size:8.5px;gap:4px}
+    .hbar .ht{height:5px}
+    .mfoot{display:none}
+  }
+  /* 矮屏（≤820px 高）：压缩 KPI / 文章矩阵，把高度让给中间图表墙，仍保持一屏不滚动 */
+  @media (max-height:820px){
+    .dash{gap:9px;padding:10px 14px}
+    header{padding:6px 12px}
+    header h1{font-size:15px}
+    header .sub{display:none}
+    .logo{width:28px;height:28px;font-size:15px}
+    .clock .t{font-size:17px}
+    .kpis{gap:9px}
+    .kpi{padding:8px 11px}
+    .kpi .val{font-size:21px;margin-top:2px}
+    .kpi .lab{font-size:10.5px}
+    .kpi .spark{margin-top:2px;font-size:9.5px}
+    .kpi .kspark{width:70px;height:26px;top:7px;right:7px}
+    .wall-head{padding:0 2px}
+    .wall-head .wt{font-size:13px}
+    .rail{flex-basis:126px;height:126px}
+    .rcard{flex-basis:186px;width:186px;height:114px}
+    .rcard .cv{height:56px}
+    .rcard .ti{font-size:11px;-webkit-line-clamp:2}
+    .rcard .info{padding:6px 9px 5px}
+    .rcard .mt>span:not(.seq):not(.chip){display:none}
+    .matrix{padding:8px 14px 6px}
+    .matrix .head{margin-bottom:5px}
+    .matrix .head h2{font-size:12.5px}
   }
 </style>
 </head>
@@ -1513,7 +1562,7 @@ function gLine(series,o={}){
   const ss=(series||[]).filter(s=>s&&(s.vals||[]).length);
   if(!ss.length)return gEmpty("暂无趋势数据");
   const n=Math.max(...ss.map(s=>s.vals.length)),
-        max=Math.max(1,...ss.flatMap(s=>s.vals.map(v=>Number(v)||0)))*1.1,
+        max=o.max!=null?Number(o.max):Math.max(1,...ss.flatMap(s=>s.vals.map(v=>Number(v)||0)))*1.1,
         pl=34,pr=12,pt=12,pb=22,id=gId();
   const X=i=>pl+(320-pl-pr)*i/Math.max(1,n-1),Y=v=>140-pb-(140-pt-pb)*(Number(v)||0)/max;
   const path=vals=>vals.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(" ");
@@ -1547,7 +1596,9 @@ function gBars(items,o={}){
     bars+=`<g title="${esc(it.tip||it.label||"")} · ${fmt(v)}"><rect class="a-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}"
       width="${bw.toFixed(1)}" height="${Math.max(bh,1).toFixed(1)}" rx="2"
       fill="${it.color||(hot?`url(#${id}H)`:`url(#${id}B)`)}"/>
-      ${hot&&o.showPeak!==false?`<text class="a-fade" x="${(x+bw/2).toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="middle" fill="#ffb547" font-size="10.5">${fmt(v)}</text>`:""}</g>`;
+      ${hot&&o.showPeak!==false?`<text class="a-fade" x="${(x+bw/2).toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="middle" fill="#ffb547" font-size="10.5">${fmt(v)}</text>`:""}
+      ${o.vals&&!(hot&&o.showPeak!==false)?`<text class="a-fade" x="${(x+bw/2).toFixed(1)}" y="${(y-3).toFixed(1)}" text-anchor="middle"
+        fill="${it.vc||"#9cc3ee"}" font-size="9">${esc(o.fmtV?o.fmtV(v):fmt(v))}</text>`:""}</g>`;
     if(i%Math.max(1,Math.ceil(items.length/6))===0||i===items.length-1)
       labels+=`<text x="${(x+bw/2).toFixed(1)}" y="135" text-anchor="middle" fill="#6f86ab" font-size="9">${esc(gClip(it.label||"",6))}</text>`;
   });
@@ -1956,9 +2007,11 @@ function wallSpec(v){
         C("05","文章阅读 TOP8",`${fmt(top.length)} 篇`,gHBars(top,{clip:12}),"标题截断显示 · 鼠标悬停看完整标题"),
         C("06","阅读 × 分享",`r ${r==null?"—":r}`,gScatter(sc,{xLabel:"阅读",yLabel:"分享"}),"每点=一篇文章 · 金线为线性拟合"),
         C("07","受众 / 流量指标",`${fmt(P.n||0)} 人`,gBars([
-          {label:"男性",value:pm.malePct||0},{label:"核心年龄",value:pm.coreAgePct||0},
-          {label:"推荐占比",value:pm.recommendPct||0},{label:"送达打开",value:pm.deliverOpenRate||0}],
-          {hot:false,max:100,fmtY:k=>Math.round(k)+"%"}),"多篇文章按阅读人数加权 · 单位为 %"),
+          {label:"男性占比",value:pm.malePct||0},{label:"核心年龄",value:pm.coreAgePct||0},
+          {label:"推荐占比",value:pm.recommendPct||0},
+          {label:"送达打开率",value:pm.deliverOpenRate||0,color:"#ffb547",vc:"#ffd479"}],
+          {hot:false,max:100,vals:true,fmtV:v=>v.toFixed(1)+"%",fmtY:k=>Math.round(k)+"%"}),
+          "前 3 项为受众/流量占比，末项(金)为送达打开率 · 口径不同"),
         C("08","15 日阅读热力",`${dd.length} 天`,gHeatDays(dd,"read"),"色深=当日阅读 · 悬停看当天数值"),
         hCard]};
   }
@@ -2013,7 +2066,7 @@ function wallSpec(v){
           {label:"差值",value:(Number(low.meanScore)||0)-g,color:GPAL[4]}],{fmt:x=>+x.toFixed(2)}),"有效性回测：低于全局均值会触发降级判定"),
         C("06","置信度演进",`${({cold:"冷启动",warm:"积累中",strong:"可信"})[(hist[hist.length-1]||{}).confidence]||"—"}`,
           gLine([{vals:hist.map(h=>({cold:0,warm:50,strong:100})[h.confidence]||0)}],
-            {labels:hist.map(h=>String(h.builtAt||"").slice(0,10)),fmtY:k=>Math.round(k)}),"0=冷启动 / 50=积累中 / 100=可信"),
+            {labels:hist.map(h=>String(h.builtAt||"").slice(0,10)),max:100,fmtY:k=>Math.round(k)}),"0=冷启动 / 50=积累中 / 100=可信"),
         C("07","假设状态",`${hyps.length} 条`,gRing(Object.entries(stCount).map(([k,x],i)=>({label:{wait:"待观察",ok:"已验证",fail:"已否证"}[k]||k,value:x,color:GPAL[i%GPAL.length]})),{sub:"条假设"}),"未满足样本阈值前一律不判定"),
         C("08","样本来源",`${fmt(real)} 篇真实`,srcRing(),"历史回填只作参考，不计入实验结论"),
         hCard]};
@@ -2033,13 +2086,13 @@ function wallSpec(v){
       C("01","归因漏斗",`${fmt(am.length)} 条指令`,gFunnel([
         {label:"约束指令",value:am.length},{label:"待观察",value:asum.wait||0},
         {label:"显著结论",value:asum.significantPos||0},{label:"实测样本",value:M.real}]),"从指令到可下结论样本的真实收敛"),
-      C("02","命中 vs 控制均值",`选中 ${gClip((am[pick]||{}).val,5)}`,gBars(am.flatMap(x=>[
-        {label:gClip(x.val,4)+"·命中",value:Number(x.conformMean)||0,color:GPAL[0],tip:aTip(x)},
-        {label:gClip(x.val,4)+"·控制",value:Number(x.ctrlMean)||0,color:GPAL[2],tip:aTip(x)}]),
-        {showPeak:false,fmtY:k=>+k.toFixed(1)}),"分组黏性均值 · 悬停看命中/控制文章数"),
-      C("03","分组样本量",`${fmt(am.length*2)} 格`,gHBars(am.flatMap(x=>[
-        {label:gClip(x.val,7)+" 命中",value:Number(x.nConform)||0,color:GPAL[0]},
-        {label:gClip(x.val,7)+" 控制",value:Number(x.nCtrl)||0,color:GPAL[2]}]),{clip:14}),"每组真实篇数 · 与是否回填分开统计"),
+      C("02","命中 vs 控制均值",`选中 ${gClip((am[pick]||{}).val,5)}`,gBars(am.flatMap((x,i)=>[
+        {label:`#${i+1}命中`,value:Number(x.conformMean)||0,color:GPAL[0],tip:aTip(x)},
+        {label:`#${i+1}控制`,value:Number(x.ctrlMean)||0,color:GPAL[2],tip:aTip(x)}]),
+        {showPeak:false,fmtY:k=>+k.toFixed(1)}),"#n 为分组序号（下一张卡同序）· 悬停看命中/控制文章数"),
+      C("03","分组样本量",`${fmt(am.length*2)} 格`,gHBars(am.flatMap((x,i)=>[
+        {label:`#${i+1} ${gClip(x.val,7)} 命中`,value:Number(x.nConform)||0,color:GPAL[0]},
+        {label:`#${i+1} ${gClip(x.val,7)} 控制`,value:Number(x.nCtrl)||0,color:GPAL[2]}]),{clip:15}),"每组真实篇数 · 与是否回填分开统计"),
       C("04","指令类型分布",`${Object.keys(byType).length} 类`,gRing(Object.entries(byType).map(([k,x],i)=>({label:k,value:x,color:GPAL[i%GPAL.length]})),{sub:"条指令"}),"标题句式 / 内容支柱 / 开头钩子"),
       C("05","距显著阈值","单组 ≥3 篇",gHBars(am.map(x=>({label:gClip(x.val,10),
         value:Math.max(0,3-Math.min(Number(x.nConform)||0,Number(x.nCtrl)||0))})),{clip:14}),"还需补齐的较少组样本数 · 0 才能判定"),

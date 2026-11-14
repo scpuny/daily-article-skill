@@ -147,6 +147,15 @@ attribution funnel / hit-vs-control bars / distance-to-threshold for 归因矩�
 All inline SVG/CSS computed from the local ledger and strategy snapshots — no chart
 library, no network calls, no fabricated numbers (there is deliberately no
 "articles per day" bar chart, since one article is published per day).
+
+Short viewports (<=820px tall, e.g. 1366x768 projectors) compress the KPI row and the
+article marquee so the wall still fits one screen without scrolling. The chart cell is
+`container-type:size` + `overflow:hidden`: HTML-based bar charts (tag heat, weekly
+momentum) shrink their font/gap via `@container (max-height:...)` rules instead of
+overflowing upward and covering the card title — this was a real bug at 1366x768.
+Bars with `vals:true` print every value on top of the bar (a 2% open-rate bar is
+otherwise invisible next to a 97% share bar), and attribution hit/control bars use
+`#1命中 / #1控制` group indices because long instruction names truncate identically.
 The header is a single row: brand, five view tabs, data-source status, every action
 (import / clear / article manager / settings) and the clock. Each wall has a title
 row with KV badges (five, or three when it also holds operations) — there is no STEP
